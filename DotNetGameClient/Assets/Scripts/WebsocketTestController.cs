@@ -22,7 +22,10 @@ public class WebsocketTestController : MonoBehaviour
     private async UniTask DoMainLoop()
     {
         // TODO: Handle an exception being thrown as a result of the connection failing.
-        _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:8088/ws/"));
+        _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:5000/ws"));
+
+        // Send a test message.
+        _socket.SendString("Connected to server!");
 
         // Once the initial state has been received from the server, spawn two tasks to
         // run concurrently:
@@ -61,7 +64,10 @@ public class WebsocketTestController : MonoBehaviour
 
     private void OnDestroy()
     {
-        _socket.Close();
-        _socket = null;
+        if (_socket != null)
+        {
+            _socket.Close();
+            _socket = null;
+        }
     }
 }

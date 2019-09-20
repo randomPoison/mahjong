@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -93,7 +93,7 @@ public class WebSocket
     WebSocketSharp.WebSocket _socket;
 
     // Queues for tracking pending tasks (i.e. tasks for code that is awaiting a message) and
-    // recieved messages that haven't been dispatched.
+    // received messages that haven't been dispatched.
     Queue<TaskCompletionSource<byte[]>> _pendingTasks = new Queue<TaskCompletionSource<byte[]>>();
     Queue<byte[]> _pendingMessages = new Queue<byte[]>();
 
@@ -159,7 +159,7 @@ public class WebSocket
     /// Returns the next message received on the socket as a byte array.
     /// </summary>
     ///
-    /// <returns>The next message recieved on the socket.</returns>
+    /// <returns>The next message received on the socket.</returns>
     ///
     /// <exception cref="WebSocketException">
     /// Throws an exception if an error occurs while waiting for an incoming message,
