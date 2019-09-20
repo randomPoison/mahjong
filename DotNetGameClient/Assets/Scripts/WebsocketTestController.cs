@@ -44,7 +44,6 @@ public class WebsocketTestController : MonoBehaviour
         {
             if (Input.GetMouseButton(0))
             {
-                Debug.Log("Player clicked their mouse");
             }
 
             await UniTask.Yield();

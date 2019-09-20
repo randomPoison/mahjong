@@ -1,29 +1,111 @@
 "use strict";
 
-var connection = new signalR.HubConnectionBuilder().withUrl("/chatHub").build();
+var connectionUrl = document.getElementById("connectionUrl");
+var connectButton = document.getElementById("connectButton");
+var stateLabel = document.getElementById("stateLabel");
+var sendMessage = document.getElementById("sendMessage");
+var sendButton = document.getElementById("sendButton");
+var commsLog = document.getElementById("commsLog");
+var closeButton = document.getElementById("closeButton");
+var socket;
+var scheme = document.location.protocol === "https:" ? "wss" : "ws";
+var port = document.location.port ? (":" + document.location.port) : "";
 
-//Disable send button until connection is established
-document.getElementById("sendButton").disabled = true;
+connectionUrl.value = scheme + "://" + document.location.hostname + port + "/ws";
 
-connection.on("ReceiveMessage", function (user, message) {
-    var msg = message.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    var encodedMsg = user + " says " + msg;
-    var li = document.createElement("li");
-    li.textContent = encodedMsg;
-    document.getElementById("messagesList").appendChild(li);
-});
+function updateState() {
+    function disable() {
+        sendMessage.disabled = true;
+        sendButton.disabled = true;
+        closeButton.disabled = true;
+    }
 
-connection.start().then(function () {
-    document.getElementById("sendButton").disabled = false;
-}).catch(function (err) {
-    return console.error(err.toString());
-});
+    function enable() {
+        sendMessage.disabled = false;
+        sendButton.disabled = false;
+        closeButton.disabled = false;
+    }
 
-document.getElementById("sendButton").addEventListener("click", function (event) {
-    var user = document.getElementById("userInput").value;
-    var message = document.getElementById("messageInput").value;
-    connection.invoke("SendMessage", user, message).catch(function (err) {
-        return console.error(err.toString());
-    });
-    event.preventDefault();
-});
+    connectionUrl.disabled = true;
+    connectButton.disabled = true;
+    if (!socket) {
+        disable();
+    } else {
+        switch (socket.readyState) {
+            case WebSocket.CLOSED:
+                stateLabel.innerHTML = "Closed";
+                disable();
+                connectionUrl.disabled = false;
+                connectButton.disabled = false;
+                break;
+            case WebSocket.CLOSING:
+                stateLabel.innerHTML = "Closing...";
+                disable();
+                break;
+            case WebSocket.CONNECTING:
+                stateLabel.innerHTML = "Connecting...";
+                disable();
+                break;
+            case WebSocket.OPEN:
+                stateLabel.innerHTML = "Open";
+                enable();
+                break;
+            default:
+                stateLabel.innerHTML = "Unknown WebSocket State: " + htmlEscape(socket.readyState);
+                disable();
+                break;
+        }
+    }
+}
+
+closeButton.onclick = function () {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        alert("socket not connected");
+    }
+    socket.close(1000, "Closing from client");
+};
+
+sendButton.onclick = function () {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+        alert("socket not connected");
+    }
+    var data = sendMessage.value;
+    socket.send(data);
+    commsLog.innerHTML += '<tr>' +
+        '<td class="commslog-client">Client</td>' +
+        '<td class="commslog-server">Server</td>' +
+        '<td class="commslog-data">' + htmlEscape(data) + '</td></tr>';
+};
+
+connectButton.onclick = function () {
+    stateLabel.innerHTML = "Connecting";
+    socket = new WebSocket(connectionUrl.value);
+    socket.onopen = function (event) {
+        updateState();
+        commsLog.innerHTML += '<tr>' +
+            '<td colspan="3" class="commslog-data">Connection opened</td>' +
+            '</tr>';
+    };
+    socket.onclose = function (event) {
+        updateState();
+        commsLog.innerHTML += '<tr>' +
+            '<td colspan="3" class="commslog-data">Connection closed. Code: ' + htmlEscape(event.code) + '. Reason: ' + htmlEscape(event.reason) + '</td>' +
+            '</tr>';
+    };
+    socket.onerror = updateState;
+    socket.onmessage = function (event) {
+        commsLog.innerHTML += '<tr>' +
+            '<td class="commslog-server">Server</td>' +
+            '<td class="commslog-client">Client</td>' +
+            '<td class="commslog-data">' + htmlEscape(event.data) + '</td></tr>';
+    };
+};
+
+function htmlEscape(str) {
+    return str.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}

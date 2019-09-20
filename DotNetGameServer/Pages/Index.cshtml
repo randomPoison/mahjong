@@ -1,26 +1,31 @@
 ﻿@page
 <div class="container">
-    <div class="row">&nbsp;</div>
-    <div class="row">
-        <div class="col-6">&nbsp;</div>
-        <div class="col-6">
-            User..........<input type="text" id="userInput" />
-            <br />
-            Message...<input type="text" id="messageInput" />
-            <input type="button" id="sendButton" value="Send Message" />
-        </div>
+    <h1>WebSocket Sample Application</h1>
+    <p id="stateLabel">Ready to connect...</p>
+    <div>
+        <label for="connectionUrl">WebSocket Server URL:</label>
+        <input id="connectionUrl" />
+        <button id="connectButton" type="submit">Connect</button>
     </div>
-    <div class="row">
-        <div class="col-12">
-            <hr />
-        </div>
+    <p></p>
+    <div>
+        <label for="sendMessage">Message to send:</label>
+        <input id="sendMessage" disabled />
+        <button id="sendButton" type="submit" disabled>Send</button>
+        <button id="closeButton" disabled>Close Socket</button>
     </div>
-    <div class="row">
-        <div class="col-6">&nbsp;</div>
-        <div class="col-6">
-            <ul id="messagesList"></ul>
-        </div>
-    </div>
+
+    <h2>Communication Log</h2>
+    <table style="width: 800px">
+        <thead>
+            <tr>
+                <td style="width: 100px">From</td>
+                <td style="width: 100px">To</td>
+                <td>Data</td>
+            </tr>
+        </thead>
+        <tbody id="commsLog">
+        </tbody>
+    </table>
 </div>
-<script src="~/lib/signalr/dist/browser/signalr.js"></script>
 <script src="~/js/chat.js"></script>
