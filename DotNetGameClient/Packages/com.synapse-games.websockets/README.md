@@ -4,7 +4,7 @@ Simple WebSockets for Unity WebGL
 Description
 ===========
 
-This package implements basic support for the WebSocket networking protocol in Unity WebGL. 
+This package implements basic support for the WebSocket networking protocol in Unity WebGL.
 
 For security reasons, direct access to IP Sockets is not available in JavaScript. However, it is possible to use the WebSockets protocol to implement networking in WebGL games. This package provides a JavaScript wrapper library which lets you use the browsers WebSockets JavaScript API from within Unity. For testing in the editor and running in other platforms, an implementation of the protocol using the websocket-sharp library is used.
 

@@ -7,23 +7,7 @@ using UnityEngine.AddressableAssets;
 
 public class GameController : MonoBehaviour
 {
-    [SerializeField]
-    private AssetReference _playerPrefab = null;
-
-    [SerializeField]
-    private AssetReference _playerMovementPreviewPrefab = null;
-
-    [SerializeField]
-    private Camera _camera = null;
-
     private WebSocket _socket;
-
-    private void Awake()
-    {
-        Debug.Assert(_playerPrefab != null, "Player prefab wasn't setup", this);
-        Debug.Assert(_playerMovementPreviewPrefab != null, "Player movement preview prefab wasn't setup", this);
-        Debug.Assert(_camera != null, "Camera hasn't been setup on game controller", this);
-    }
 
     private async void Start()
     {
@@ -42,12 +26,6 @@ public class GameController : MonoBehaviour
         // TODO: Handle an exception being thrown as a result of the connection failing.
         _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:8088/ws/"));
 
-        // Wait for the initial game state to come in from the server.
-        //
-        // TODO: Handle an exception being thrown while waiting (i.e. if we disconnect).
-        // TODO: Handle serialization errors.
-        var state = await _socket.RecvMessageAsync<GameStateData>();
-
         // Once the initial state has been received from the server, spawn two tasks to
         // run concurrently:
         //
@@ -65,10 +43,7 @@ public class GameController : MonoBehaviour
         {
             if (Input.GetMouseButton(0))
             {
-                var screenPos = Input.mousePosition;
-                var worldPos = _camera.ScreenToWorldPoint(new Vector3(screenPos.x, screenPos.y, _camera.transform.position.y));
-
-                Debug.DrawLine(_camera.transform.position, worldPos);
+                Debug.Log("Player clicked their mouse");
             }
 
             await UniTask.Yield();
@@ -81,7 +56,8 @@ public class GameController : MonoBehaviour
         {
             // TODO: Handle an exception being thrown while waiting (i.e. if we disconnect).
             // TODO: Handle serialization errors.
-            var update = await _socket.RecvMessageAsync<Message>();
+            var message = await _socket.RecvStringAsync();
+            Debug.Log($"Received message: {message}");
         }
     }
 
