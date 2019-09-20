@@ -1,11 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using UniRx.Async;
 using UnityEngine;
-using UnityEngine.AddressableAssets;
 
-public class GameController : MonoBehaviour
+public class WebsocketTestController : MonoBehaviour
 {
     private WebSocket _socket;
 
