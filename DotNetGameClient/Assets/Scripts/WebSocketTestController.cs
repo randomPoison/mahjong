@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using UniRx.Async;
 using UnityEngine;
 
-public class WebsocketTestController : MonoBehaviour
+public class WebSocketTestController : MonoBehaviour
 {
     private WebSocket _socket;
 
