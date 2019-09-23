@@ -17,6 +17,6 @@ In the `DotNetGameServer` directory, run the following command in your terminal:
 dotnet run
 ```
 
-> NOTE: This project is also configured to be work with Visual Studio Code. If you open the `DotNetGameServer` folder in VS Code, you can can run the ".NET Core Launch" debug task to launch the game and attached the debugger.
+> NOTE: This project is also configured to be work with Visual Studio Code. If you open the `DotNetGameServer` folder in VS Code, you can can use the `Debug > Start Debugging` menu item to run the server and attach the debugger. You'll need the [C# extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.csharp) installed.
 
 To run the client, open the `DotNetGameClient` project in Unity 2019.2, open the WebsocketTest scene, and hit play in the editor.
