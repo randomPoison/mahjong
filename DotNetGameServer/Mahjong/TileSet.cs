@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using EnumUtils;
 
 namespace DotNetGame.Mahjong
 {
@@ -11,7 +12,7 @@ namespace DotNetGame.Mahjong
             var tiles = new List<ITile>();
 
             // Add the simple tiles for each suit.
-            foreach (var suit in Enum.GetValues(typeof(Suit)).Cast<Suit>())
+            foreach (var suit in EnumHelper.GetValues<Suit>())
             {
                 for (var number = 1; number <= 9; number += 1)
                 {
@@ -20,23 +21,23 @@ namespace DotNetGame.Mahjong
             }
 
             // Add the honor tiles.
-            foreach (var dragon in Enum.GetValues(typeof(Dragon)).Cast<Dragon>())
+            foreach (var dragon in EnumHelper.GetValues<Dragon>())
             {
                 tiles.Add(new HonorTile(dragon));
             }
 
-            foreach (var wind in Enum.GetValues(typeof(Wind)).Cast<Wind>())
+            foreach (var wind in EnumHelper.GetValues<Wind>())
             {
                 tiles.Add(new HonorTile(wind));
             }
 
             // Add the bonus tiles.
-            foreach (var flower in Enum.GetValues(typeof(Flower)).Cast<Flower>())
+            foreach (var flower in EnumHelper.GetValues<Flower>())
             {
                 tiles.Add(new BonusTile(flower));
             }
 
-            foreach (var season in Enum.GetValues(typeof(Season)).Cast<Season>())
+            foreach (var season in EnumHelper.GetValues<Season>())
             {
                 tiles.Add(new BonusTile(season));
             }
