@@ -1,0 +1,14 @@
+{
+    "name": "com.synapse-games.mahjong",
+    "version": "0.1.0",
+    "displayName": "Mahjong",
+    "description": "Share Mahjong implementation",
+    "unity": "2019.2",
+    "keywords": [
+        "mahjong"
+    ],
+    "author": {
+        "name": "David LeGare",
+        "email": "dlegare@synapse-games.com"
+    }
+}
