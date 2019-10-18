@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "./Mahjong"
+		},
+		{
+			"path": "./DotNetGameServer"
+		},
+		{
+			"path": "./DotNetGameClient"
+		}
+	],
+	"settings": {}
+}
