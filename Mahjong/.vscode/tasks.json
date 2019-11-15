@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "publish",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}/Mahjong.csproj",
+                "/property:GenerateFullPaths=true",
+                "/consoleloggerparameters:NoSummary",
+                "-c=Release",
+                "-o=../DotNetGameClient/Packages/com.synapse-games.mahjong"
+            ],
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}
