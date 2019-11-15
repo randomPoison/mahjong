@@ -14,19 +14,28 @@ namespace DotNetGame.Mahjong
             {
                 for (var number = 1; number <= 9; number += 1)
                 {
-                    tiles.Add(new SimpleTile(suit, number));
+                    for (var count = 0; count < 4; count += 1)
+                    {
+                        tiles.Add(new SimpleTile(suit, number));
+                    }
                 }
             }
 
             // Add the honor tiles.
             foreach (var dragon in EnumHelper.GetValues<Dragon>())
             {
-                tiles.Add(new HonorTile(dragon));
+                for (var count = 0; count < 4; count += 1)
+                {
+                    tiles.Add(new HonorTile(dragon));
+                }
             }
 
             foreach (var wind in EnumHelper.GetValues<Wind>())
             {
-                tiles.Add(new HonorTile(wind));
+                for (var count = 0; count < 4; count += 1)
+                {
+                    tiles.Add(new HonorTile(wind));
+                }
             }
 
             // Add the bonus tiles.

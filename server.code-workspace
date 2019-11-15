@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "Mahjong"
+		},
+		{
+			"path": "Mahjong.Tests"
 		}
 	],
 	"settings": {}

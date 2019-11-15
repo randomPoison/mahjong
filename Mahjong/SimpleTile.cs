@@ -14,7 +14,7 @@ namespace DotNetGame.Mahjong
 
         public SimpleTile(Suit suit, int number)
         {
-            if (number < 1 || number > 0)
+            if (number < 1 || number > 9)
             {
                 throw new ArgumentException($"Invalid simple tile number: {number}");
             }
