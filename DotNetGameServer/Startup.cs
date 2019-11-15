@@ -1,18 +1,24 @@
 using System;
 using System.Net.WebSockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using DotNetGame.Mahjong;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 
 namespace DotNetGame
 {
     public class Startup
     {
+        // TODO: Find a proper, non-static place to hold the tiles and other game state.
+        private readonly static ITile[] Tiles = TileSet.GenerateTiles();
+
         public Startup(IConfiguration configuration)
         {
             Configuration = configuration;
@@ -72,13 +78,21 @@ namespace DotNetGame
             });
         }
 
-        private async Task Echo(HttpContext context, WebSocket socket)
+        private async Task Echo(HttpContext context, WebSocket socket, CancellationToken cancellation = default)
         {
             var buffer = new byte[1024 * 4];
 
+            // When a client first connects, send them the current set of tiles.
+            var tilesMessage = JsonConvert.ToString(Tiles);
+            await socket.SendAsync(
+                Encoding.UTF8.GetBytes(tilesMessage),
+                WebSocketMessageType.Text,
+                true,
+                cancellation);
+
             var result = await socket.ReceiveAsync(
-                new ArraySegment<byte>(buffer),
-                CancellationToken.None);
+                buffer,
+                cancellation);
 
             while (!result.CloseStatus.HasValue)
             {
@@ -86,14 +100,17 @@ namespace DotNetGame
                     new ArraySegment<byte>(buffer, 0, result.Count),
                     result.MessageType,
                     result.EndOfMessage,
-                    CancellationToken.None);
+                    cancellation);
 
                 result = await socket.ReceiveAsync(
                     new ArraySegment<byte>(buffer),
-                    CancellationToken.None);
+                    cancellation);
             };
 
-            await socket.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+            await socket.CloseAsync(
+                result.CloseStatus.Value,
+                result.CloseStatusDescription,
+                cancellation);
         }
     }
 }
