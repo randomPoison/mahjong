@@ -2,11 +2,13 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="EnumUtils" Version="2.0.19031.1" />
+    <PackageReference Include="JsonSubTypes" Version="1.6.0" />
   </ItemGroup>
 
 </Project>
