@@ -10,6 +10,7 @@
       "Mahjong/1.0.0": {
         "dependencies": {
           "EnumUtils": "2.0.19031.1",
+          "JsonSubTypes": "1.6.0",
           "NETStandard.Library": "2.0.3"
         },
         "runtime": {
@@ -24,10 +25,29 @@
           }
         }
       },
+      "JsonSubTypes/1.6.0": {
+        "dependencies": {
+          "Newtonsoft.Json": "11.0.2"
+        },
+        "runtime": {
+          "lib/netstandard2.0/JsonSubTypes.dll": {
+            "assemblyVersion": "1.6.0.0",
+            "fileVersion": "1.6.0.0"
+          }
+        }
+      },
       "Microsoft.NETCore.Platforms/1.1.0": {},
       "NETStandard.Library/2.0.3": {
         "dependencies": {
           "Microsoft.NETCore.Platforms": "1.1.0"
+        }
+      },
+      "Newtonsoft.Json/11.0.2": {
+        "runtime": {
+          "lib/netstandard2.0/Newtonsoft.Json.dll": {
+            "assemblyVersion": "11.0.0.0",
+            "fileVersion": "11.0.2.21924"
+          }
         }
       }
     }
@@ -45,6 +65,13 @@
       "path": "enumutils/2.0.19031.1",
       "hashPath": "enumutils.2.0.19031.1.nupkg.sha512"
     },
+    "JsonSubTypes/1.6.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-XhoIgNod80d5E0Eqk6kKIyA8GSmtZNyf3vPy1uJezYI67aDI0/y7Pjrw/O8sDU1+EuoVr0OCUstAuKdjkwOxeA==",
+      "path": "jsonsubtypes/1.6.0",
+      "hashPath": "jsonsubtypes.1.6.0.nupkg.sha512"
+    },
     "Microsoft.NETCore.Platforms/1.1.0": {
       "type": "package",
       "serviceable": true,
@@ -58,6 +85,13 @@
       "sha512": "sha512-st47PosZSHrjECdjeIzZQbzivYBJFv6P2nv4cj2ypdI204DO+vZ7l5raGMiX4eXMJ53RfOIg+/s4DHVZ54Nu2A==",
       "path": "netstandard.library/2.0.3",
       "hashPath": "netstandard.library.2.0.3.nupkg.sha512"
+    },
+    "Newtonsoft.Json/11.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-IvJe1pj7JHEsP8B8J8DwlMEx8UInrs/x+9oVY+oCD13jpLu4JbJU2WCIsMRn5C4yW9+DgkaO8uiVE5VHKjpmdQ==",
+      "path": "newtonsoft.json/11.0.2",
+      "hashPath": "newtonsoft.json.11.0.2.nupkg.sha512"
     }
   }
 }
