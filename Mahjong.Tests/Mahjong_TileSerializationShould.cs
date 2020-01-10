@@ -31,5 +31,17 @@ namespace Mahjong.Tests
             ITile tile = new SimpleTile(Suit.Coins, 1);
             var json = JsonConvert.SerializeObject(tile);
         }
+
+        [Fact]
+        public void SimpleTile_AsITile_DeserializeJson()
+        {
+            ITile tile = new SimpleTile(Suit.Coins, 1);
+            var json = JsonConvert.SerializeObject(tile);
+
+            ITile result = JsonConvert.DeserializeObject<ITile>(json);
+            SimpleTile resultTile = (SimpleTile)result;
+            Assert.Equal(Suit.Coins, resultTile.Suit);
+            Assert.Equal(1, resultTile.Number);
+        }
     }
 }

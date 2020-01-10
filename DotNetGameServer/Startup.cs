@@ -83,7 +83,7 @@ namespace DotNetGame
             var buffer = new byte[1024 * 4];
 
             // When a client first connects, send them the current set of tiles.
-            var tilesMessage = JsonConvert.ToString(Tiles);
+            var tilesMessage = JsonConvert.SerializeObject(Tiles);
             await socket.SendAsync(
                 Encoding.UTF8.GetBytes(tilesMessage),
                 WebSocketMessageType.Text,
