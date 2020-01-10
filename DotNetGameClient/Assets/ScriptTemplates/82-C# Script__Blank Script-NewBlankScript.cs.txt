@@ -1,0 +1,6 @@
+﻿namespace Synapse.Mahjong
+{
+    public class #SCRIPTNAME#
+    {
+    }
+}
