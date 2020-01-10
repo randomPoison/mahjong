@@ -1,17 +1,17 @@
 using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
-using System.Net.Sockets;
 using System.Text;
-using System.Collections;
-using UnityEngine;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+using System.Collections;
+using System.Runtime.InteropServices;
+#else
+using System.Collections.Generic;
+#endif
 
 public class WebSocket
 {
-    private Uri _url;
+    private readonly Uri _url;
 
     public void SendString(string str)
     {
@@ -25,77 +25,95 @@ public class WebSocket
     }
 
 #if UNITY_WEBGL && !UNITY_EDITOR
-	[DllImport("__Internal")]
-	private static extern int SocketCreate (string url);
+    [DllImport("__Internal")]
+    private static extern int SocketCreate(string url);
 
-	[DllImport("__Internal")]
-	private static extern int SocketState (int socketInstance);
+    [DllImport("__Internal")]
+    private static extern int SocketState(int socketInstance);
 
-	[DllImport("__Internal")]
-	private static extern void SocketSend (int socketInstance, byte[] ptr, int length);
+    [DllImport("__Internal")]
+    private static extern void SocketSend(int socketInstance, byte[] ptr, int length);
 
-	[DllImport("__Internal")]
-	private static extern void SocketRecv (int socketInstance, byte[] ptr, int length);
+    [DllImport("__Internal")]
+    private static extern void SocketRecv(int socketInstance, byte[] ptr, int length);
 
-	[DllImport("__Internal")]
-	private static extern int SocketRecvLength (int socketInstance);
+    [DllImport("__Internal")]
+    private static extern int SocketRecvLength(int socketInstance);
 
-	[DllImport("__Internal")]
-	private static extern void SocketClose (int socketInstance);
+    [DllImport("__Internal")]
+    private static extern void SocketClose(int socketInstance);
 
-	[DllImport("__Internal")]
-	private static extern int SocketError (int socketInstance, byte[] ptr, int length);
+    [DllImport("__Internal")]
+    private static extern int SocketError(int socketInstance, byte[] ptr, int length);
 
-	int m_NativeRef = 0;
+    private int m_NativeRef = 0;
 
-	public void Send(byte[] buffer)
-	{
-		SocketSend (m_NativeRef, buffer, buffer.Length);
-	}
+    public static Task<WebSocket> ConnectAsync(Uri url)
+    {
+        throw new NotImplementedException();
+    }
 
-	public byte[] Recv()
-	{
-		int length = SocketRecvLength (m_NativeRef);
-		if (length == 0)
-			return null;
-		byte[] buffer = new byte[length];
-		SocketRecv (m_NativeRef, buffer, length);
-		return buffer;
-	}
+    public void Send(byte[] buffer)
+    {
+        SocketSend(m_NativeRef, buffer, buffer.Length);
+    }
 
-	public IEnumerator Connect()
-	{
-		m_NativeRef = SocketCreate (mUrl.ToString());
+    public byte[] Recv()
+    {
+        var length = SocketRecvLength(m_NativeRef);
+        if (length == 0)
+        {
+            return null;
+        }
 
-		while (SocketState(m_NativeRef) == 0)
-			yield return 0;
-	}
+        var buffer = new byte[length];
+        SocketRecv(m_NativeRef, buffer, length);
+        return buffer;
+    }
 
-	public void Close()
-	{
-		SocketClose(m_NativeRef);
-	}
+    public IEnumerator Connect()
+    {
+        m_NativeRef = SocketCreate(_url.ToString());
 
-	public string error
-	{
-		get {
-			const int bufsize = 1024;
-			byte[] buffer = new byte[bufsize];
-			int result = SocketError (m_NativeRef, buffer, bufsize);
+        while (SocketState(m_NativeRef) == 0)
+        {
+            yield return 0;
+        }
+    }
 
-			if (result == 0)
-				return null;
+    public void Close()
+    {
+        SocketClose(m_NativeRef);
+    }
 
-			return Encoding.UTF8.GetString (buffer);
-		}
-	}
+    public Task<byte[]> RecvAsync()
+    {
+        return Task.FromResult<byte[]>(null);
+    }
+
+    public string error
+    {
+        get
+        {
+            const int bufsize = 1024;
+            var buffer = new byte[bufsize];
+            var result = SocketError(m_NativeRef, buffer, bufsize);
+
+            if (result == 0)
+            {
+                return null;
+            }
+
+            return Encoding.UTF8.GetString(buffer);
+        }
+    }
 #else
-    WebSocketSharp.WebSocket _socket;
+    private readonly WebSocketSharp.WebSocket _socket;
 
     // Queues for tracking pending tasks (i.e. tasks for code that is awaiting a message) and
     // received messages that haven't been dispatched.
-    Queue<TaskCompletionSource<byte[]>> _pendingTasks = new Queue<TaskCompletionSource<byte[]>>();
-    Queue<byte[]> _pendingMessages = new Queue<byte[]>();
+    private readonly Queue<TaskCompletionSource<byte[]>> _pendingTasks = new Queue<TaskCompletionSource<byte[]>>();
+    private readonly Queue<byte[]> _pendingMessages = new Queue<byte[]>();
 
     private WebSocket(Uri url, WebSocketSharp.WebSocket socket)
     {

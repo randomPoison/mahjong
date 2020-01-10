@@ -1,7 +1,6 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using UniRx.Async;
 using UnityEngine;
-using WebSocketSharp;
 
 public static class WebSocketUtils
 {
