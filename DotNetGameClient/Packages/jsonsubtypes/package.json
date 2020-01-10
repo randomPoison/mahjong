@@ -5,6 +5,6 @@
   "description": "JsonSubTypes is a discriminated Json sub-type Converter implementation for .NET",
   "unity": "2018.4",
   "dependencies": {
-    "jillejr.newtonsoft.json-for-unity": "12.0.1-patch-001"
+    "jillejr.newtonsoft.json-for-unity": "12.0.201"
   }
 }
