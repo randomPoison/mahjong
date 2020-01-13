@@ -13,12 +13,9 @@ var LibraryMahjong = {
     },
 
     GenerateTileset: function () {
-        // import * as wasm from "mahjong_wasm";
-
-        // var tileset = wasm.generate_tileset();
-        // return stringToBuffer(tileset);
-
-        return stringToBuffer("TODO: Actually load the wasm module");
+        // TODO: Is `generate_tileset` actually a global symbol at this point?
+        var tileset = generate_tileset();
+        return stringToBuffer(tileset);
     },
 };
 
