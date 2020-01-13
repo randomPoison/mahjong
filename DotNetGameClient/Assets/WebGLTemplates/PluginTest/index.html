@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en-us">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Unity WebGL Player | %UNITY_WEB_NAME%</title>
+    <script src="%UNITY_WEBGL_LOADER_URL%"></script>
+    <script src="StreamingAssets/mahjong_wasm.js"></script>
+
+    <script>
+        const { generate_tileset } = wasm_bindgen;
+
+        async function run() {
+            await wasm_bindgen('./StreamingAssets/mahjong_wasm_bg.wasm');
+
+            const result = generate_tileset();
+            console.log(`tileset: ${result}`);
+        }
+
+        run();
+
+        var unityInstance = UnityLoader.instantiate("unityContainer", "%UNITY_WEBGL_BUILD_URL%");
+    </script>
+
+</head>
+
+<body>
+    <div id="unityContainer" style="width: %UNITY_WIDTH%px; height: %UNITY_HEIGHT%px; margin: auto"></div>
+</body>
+
+</html>
