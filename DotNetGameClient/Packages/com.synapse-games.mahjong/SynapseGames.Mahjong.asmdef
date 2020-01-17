@@ -1,3 +1,13 @@
-﻿{
-	"name": "SynapseGames.Mahjong"
+{
+    "name": "SynapseGames.Mahjong",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": true,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }
