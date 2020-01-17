@@ -11,7 +11,7 @@ namespace Synapse.Mahjong
             "mahjong",
             EntryPoint = "__cs_bindgen_generate_tileset_json",
             CallingConvention = CallingConvention.Cdecl)]
-        private static extern IntPtr GenerateTilesetJson(out long length);
+        private static extern IntPtr GenerateTilesetJson(out int length);
 
         [DllImport(
             "mahjong",
@@ -27,7 +27,7 @@ namespace Synapse.Mahjong
             string result;
             unsafe
             {
-                result = Encoding.UTF8.GetString((byte*)rawPtr, (int)length);
+                result = Encoding.UTF8.GetString((byte*)rawPtr, length);
             }
 
             DropString(rawPtr);
