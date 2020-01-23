@@ -9,7 +9,7 @@ namespace Synapse.Mahjong
     {
         [DllImport(
             "mahjong",
-            EntryPoint = "__cs_bindgen_generate_tileset_json",
+            EntryPoint = "__cs_bindgen_generated_generate_tileset_json",
             CallingConvention = CallingConvention.Cdecl)]
         private static extern IntPtr GenerateTilesetJson(out int length);
 
@@ -22,7 +22,6 @@ namespace Synapse.Mahjong
         public string GenerateTileset()
         {
             var rawPtr = GenerateTilesetJson(out var length);
-            Debug.Log($"Raw pointer: {rawPtr}, length: {length}");
 
             string result;
             unsafe
