@@ -8,6 +8,7 @@ namespace Synapse.Mahjong
         {
             var tilesetJson = global::Mahjong.GenerateTilesetJson();
             Debug.Log(tilesetJson, this);
+            Debug.Log(global::Mahjong.TilesetSize(), this);
         }
     }
 }
