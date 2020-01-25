@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "mahjong-server",
+    "mahjong-shared",
+]

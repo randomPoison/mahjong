@@ -1,0 +1,15 @@
+[package]
+name = "mahjong"
+version = "0.1.0"
+authors = ["David LeGare <dlegare.1001@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+cs-bindgen = { version = "0.1", path = "../../cs-bindgen/cs-bindgen" }
+derive_more = "0.99.2"
+serde = { version = "1.0.104", features = ["derive"] }
+serde_json = "1.0.44"
+strum = { version = "0.17.1", features = ["derive"] }
