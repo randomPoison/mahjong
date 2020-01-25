@@ -14,6 +14,8 @@ You'll need to have the following things installed in order to build and run thi
 * The latest version of Rust: https://rustup.rs/
 * The Unity editor (currently 2019.3.0f5): https://unity3d.com/get-unity/download
 
+You'll also need to clone the [`cs-bindgen` repository](https://github.com/randomPoison/cs-bindgen) next to this repository. This is a temporary setup until `cs-bindgen` stabilizes enough to be installed directly without compiling from source.
+
 ## Running the Game
 
 To run the server, navigate to the `mahjong-server` directory and then run the following command in your terminal:
