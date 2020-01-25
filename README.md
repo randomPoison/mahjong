@@ -1,6 +1,6 @@
-# .NET Game Prototype
+# Mahjong Prototype
 
-This project is an prototype of a client-server game architecture, with the server component written in .NET C# and the client using the Unity game engine. The core architecture uses a persistent websocket connection between client and server for communication.
+This project is an prototype of a client-server game architecture, with the server component written in Rust and the client built on the Unity game engine. The core architecture uses a persistent websocket connection between client and server for communication.
 
 The goal is to evaluate:
 
@@ -9,24 +9,17 @@ The goal is to evaluate:
 
 ## Setup
 
-To run the server you'll need the .NET SDK. Follow the [installation instructions](https://dotnet.microsoft.com/learn/aspnet/hello-world-tutorial/install) to get that installed.
+You'll need to have the following things installed in order to build and run this project:
 
-In the `DotNetGameServer` directory, run the following command in your terminal:
+* The latest version of Rust: https://rustup.rs/
+* The Unity editor (currently 2019.3.0f5): https://unity3d.com/get-unity/download
 
-```
-dotnet run
-```
+## Running the Game
 
-> NOTE: This project is also configured to be work with Visual Studio Code. If you open the `DotNetGameServer` folder in VS Code, you can can use the `Debug > Start Debugging` menu item to run the server and attach the debugger. You'll need the [C# extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode.csharp) installed.
-
-To run the client, open the `DotNetGameClient` project in Unity 2019.2, open the WebsocketTest scene, and hit play in the editor.
-
-## Updating Mahjong
-
-After making changes to the shared Mahjong project, you'll need to run the following command from within the `Mahjong` directory in order to build the DLL and copy it and its dependencies into the Unity project:
+To run the server, navigate to the `mahjong-server` directory and then run the following command in your terminal:
 
 ```
-dotnet publish -c Release -o ..\DotNetGameClient\Packages\com.synapse-games.mahjong
+cargo run
 ```
 
-If you've added any new Nuget dependencies, these will show up in the Unity project as new `.dll` files. If these files are not compatible with Unity, and we provide a Unity-specific alternative in the client, you'll need to change the import settings to disable it on the appropriate platforms.
+Once the server is running, open the `mahjong-client` directory in the Unity editor. Open the main scene (TBD which one that is) and hit the play button.
