@@ -12,21 +12,19 @@ public class Mahjong
 
     public static string GenerateTilesetJson()
     {
-        var rawResult = __GenerateTilesetJson(out var length);
-        string result;
-        unsafe
-        {
-            result = Encoding.UTF8.GetString((byte*)rawResult, length);
-        }
+        var rawResult = __GenerateTilesetJson(out var length); string result; unsafe { result = Encoding.UTF8.GetString((byte*)rawResult, length); }
         DropString(rawResult); return result;
     }
+
+    [DllImport("mahjong", EntryPoint = "__cs_bindgen_generated_square", CallingConvention = CallingConvention.Cdecl)]
+    private static extern uint __Square(uint value);
+    public static uint Square(uint value) { var rawResult = __Square(value); return rawResult; }
 
     [DllImport("mahjong", EntryPoint = "__cs_bindgen_generated_tileset_size", CallingConvention = CallingConvention.Cdecl)]
     private static extern uint __TilesetSize();
 
     public static uint TilesetSize()
     {
-        var rawResult = __TilesetSize();
-        return rawResult;
+        var rawResult = __TilesetSize(); return rawResult;
     }
 }
