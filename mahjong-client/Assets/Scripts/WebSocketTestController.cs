@@ -23,7 +23,7 @@ public class WebSocketTestController : MonoBehaviour
     private async UniTask DoMainLoop()
     {
         // TODO: Handle an exception being thrown as a result of the connection failing.
-        _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:5000/ws"));
+        _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:3030/client"));
 
         // Send a test message.
         _socket.SendString("Connected to server!");

@@ -15,8 +15,10 @@ async fn main() {
         .and(warp::ws())
         .map(move |ws: warp::ws::Ws| {
             let mut game = game.clone();
-            ws.on_upgrade(move |mut socket| {
+            ws.on_upgrade(move |socket| {
                 async move {
+                    let (mut sink, mut stream) = socket.split();
+
                     let player_tiles = game
                         .draw_tiles(13)
                         .await
@@ -25,12 +27,13 @@ async fn main() {
 
                     let message = serde_json::to_string(&player_tiles)
                         .expect("Failed to serialize list of tiles");
-                    socket
-                        .send(Message::text(message))
+                    sink.send(Message::text(message))
                         .await
                         .expect("Failed to send initial hand to client");
 
-                    // TODO: Process incoming messages from the client.
+                    while let Some(message) = stream.next().await {
+                        let _ = dbg!(message);
+                    }
                 }
             })
         });
