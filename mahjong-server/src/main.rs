@@ -1,7 +1,10 @@
-use futures::prelude::*;
+use futures::{
+    prelude::*,
+    stream::{SplitSink, SplitStream},
+};
 use mahjong::Tile;
 use thespian::*;
-use warp::{filters::ws::Message, Filter};
+use warp::{filters::ws::Message, ws::WebSocket, Filter};
 
 #[tokio::main]
 async fn main() {
@@ -19,17 +22,13 @@ async fn main() {
                 async move {
                     let (mut sink, mut stream) = socket.split();
 
-                    let player_tiles = game
-                        .draw_tiles(13)
-                        .await
-                        .expect("Error when communicating with game actor while drawing tiles")
-                        .expect("Not enough tiles left in deck to draw");
+                    let stage = ClientConnection { sink }.into_stage();
+                    let client = stage.proxy();
+                    tokio::spawn(stage.run());
 
-                    let message = serde_json::to_string(&player_tiles)
-                        .expect("Failed to serialize list of tiles");
-                    sink.send(Message::text(message))
+                    game.client_connected(client)
                         .await
-                        .expect("Failed to send initial hand to client");
+                        .expect("Failed to notify game that a client connected");
 
                     while let Some(message) = stream.next().await {
                         let _ = dbg!(message);
@@ -48,6 +47,7 @@ async fn main() {
 #[derive(Debug, Clone, Actor)]
 struct GameState {
     tiles: Vec<Tile>,
+    players: Vec<PlayerState>,
 }
 
 #[thespian::actor]
@@ -62,11 +62,55 @@ impl GameState {
 
         Ok(self.tiles.split_off(self.tiles.len() - count))
     }
+
+    pub async fn client_connected(&mut self, mut client: ClientConnectionProxy) {
+        let hand = self
+            .draw_tiles(13)
+            .expect("Not enough tiles left in deck to draw");
+
+        let message = serde_json::to_string(&hand).expect("Failed to serialize list of tiles");
+        client
+            .send_text(message)
+            .await
+            .expect("Error calling `send_text` on client");
+
+        self.players.push(PlayerState {
+            hand,
+            client: Some(client),
+        });
+    }
 }
 
 impl GameState {
     pub fn new(tiles: Vec<Tile>) -> Self {
-        Self { tiles }
+        Self {
+            tiles,
+            players: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PlayerState {
+    hand: Vec<Tile>,
+
+    /// The client that's controlling this player. Will be `None` if there is no
+    /// connected client, e.g. if the client disconnected during the game.
+    client: Option<ClientConnectionProxy>,
+}
+
+#[derive(Debug, Actor)]
+struct ClientConnection {
+    sink: SplitSink<WebSocket, Message>,
+}
+
+#[thespian::actor]
+impl ClientConnection {
+    pub async fn send_text(&mut self, text: String) {
+        self.sink
+            .send(Message::text(text))
+            .await
+            .expect("Failed to send message to client");
     }
 }
 
