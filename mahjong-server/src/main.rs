@@ -1,7 +1,4 @@
-use futures::{
-    prelude::*,
-    stream::{SplitSink, SplitStream},
-};
+use futures::{prelude::*, stream::SplitSink};
 use mahjong::Tile;
 use thespian::*;
 use warp::{filters::ws::Message, ws::WebSocket, Filter};
@@ -20,13 +17,9 @@ async fn main() {
             let mut game = game.clone();
             ws.on_upgrade(move |socket| {
                 async move {
-                    let (mut sink, mut stream) = socket.split();
+                    let (sink, mut stream) = socket.split();
 
-                    let stage = ClientConnection { sink }.into_stage();
-                    let client = stage.proxy();
-                    tokio::spawn(stage.run());
-
-                    game.client_connected(client)
+                    game.client_connected(ClientConnection { sink })
                         .await
                         .expect("Failed to notify game that a client connected");
 
@@ -44,7 +37,7 @@ async fn main() {
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }
 
-#[derive(Debug, Clone, Actor)]
+#[derive(Debug, Actor)]
 struct GameState {
     tiles: Vec<Tile>,
     players: Vec<PlayerState>,
@@ -63,16 +56,13 @@ impl GameState {
         Ok(self.tiles.split_off(self.tiles.len() - count))
     }
 
-    pub async fn client_connected(&mut self, mut client: ClientConnectionProxy) {
+    pub async fn client_connected(&mut self, mut client: ClientConnection) {
         let hand = self
             .draw_tiles(13)
             .expect("Not enough tiles left in deck to draw");
 
         let message = serde_json::to_string(&hand).expect("Failed to serialize list of tiles");
-        client
-            .send_text(message)
-            .await
-            .expect("Error calling `send_text` on client");
+        client.send_text(message).await;
 
         self.players.push(PlayerState {
             hand,
@@ -90,21 +80,22 @@ impl GameState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct PlayerState {
     hand: Vec<Tile>,
 
     /// The client that's controlling this player. Will be `None` if there is no
     /// connected client, e.g. if the client disconnected during the game.
-    client: Option<ClientConnectionProxy>,
+    client: Option<ClientConnection>,
 }
 
-#[derive(Debug, Actor)]
+/// Wrapper around the sender half of the client socket providing a clean api for
+/// sending messages to the client.
+#[derive(Debug)]
 struct ClientConnection {
     sink: SplitSink<WebSocket, Message>,
 }
 
-#[thespian::actor]
 impl ClientConnection {
     pub async fn send_text(&mut self, text: String) {
         self.sink

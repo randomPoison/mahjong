@@ -749,7 +749,7 @@ dependencies = [
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "mahjong 0.1.0",
  "serde_json 1.0.45 (registry+https://github.com/rust-lang/crates.io-index)",
- "thespian 0.1.0 (git+https://github.com/randomPoison/thespian?rev=6305b17)",
+ "thespian 0.1.0 (git+https://github.com/randomPoison/thespian?rev=226378d)",
  "tokio 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "warp 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1081,14 +1081,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "proc-macro2-next"
-version = "1.0.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "unicode-xid 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1107,14 +1099,6 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "quote-next"
-version = "1.0.0-rc3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "proc-macro2-next 1.0.0-rc4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1515,16 +1499,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "syn-next"
-version = "1.0.0-rc4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "proc-macro2-next 1.0.0-rc4 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote-next 1.0.0-rc3 (registry+https://github.com/rust-lang/crates.io-index)",
- "unicode-xid 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "tempfile"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1540,24 +1514,24 @@ dependencies = [
 [[package]]
 name = "thespian"
 version = "0.1.0"
-source = "git+https://github.com/randomPoison/thespian?rev=6305b17#6305b17342f2b1a6901b3f27df74124676a58d74"
+source = "git+https://github.com/randomPoison/thespian?rev=226378d#226378d5737768df9fe1e202f3150e3b956cf03f"
 dependencies = [
  "derivative 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "num_enum 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "runtime 0.3.0-alpha.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "thespian-derive 0.1.0 (git+https://github.com/randomPoison/thespian?rev=6305b17)",
+ "thespian-derive 0.1.0 (git+https://github.com/randomPoison/thespian?rev=226378d)",
 ]
 
 [[package]]
 name = "thespian-derive"
 version = "0.1.0"
-source = "git+https://github.com/randomPoison/thespian?rev=6305b17#6305b17342f2b1a6901b3f27df74124676a58d74"
+source = "git+https://github.com/randomPoison/thespian?rev=226378d#226378d5737768df9fe1e202f3150e3b956cf03f"
 dependencies = [
- "proc-macro2-next 1.0.0-rc4 (registry+https://github.com/rust-lang/crates.io-index)",
- "quote-next 1.0.0-rc3 (registry+https://github.com/rust-lang/crates.io-index)",
- "syn-next 1.0.0-rc4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "proc-macro2 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "syn 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2036,11 +2010,9 @@ dependencies = [
 "checksum proc-macro-nested 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "369a6ed065f249a159e06c45752c780bda2fb53c995718f9e484d08daa9eb42e"
 "checksum proc-macro2 0.4.30 (registry+https://github.com/rust-lang/crates.io-index)" = "cf3d2011ab5c909338f7887f4fc896d35932e29146c12c8d01da6b22a80ba759"
 "checksum proc-macro2 1.0.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3acb317c6ff86a4e579dfa00fc5e6cca91ecbb4e7eb2df0468805b674eb88548"
-"checksum proc-macro2-next 1.0.0-rc4 (registry+https://github.com/rust-lang/crates.io-index)" = "b9f441f24eb4a92cdbd9d78c0e58f42040904151fdea75481d8399618d590769"
 "checksum quick-error 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 "checksum quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)" = "6ce23b6b870e8f94f81fb0a363d65d86675884b34a09043c81e5562f11c1f8e1"
 "checksum quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "053a8c8bcc71fcce321828dc897a98ab9760bef03a4fc36693c231e5b3216cfe"
-"checksum quote-next 1.0.0-rc3 (registry+https://github.com/rust-lang/crates.io-index)" = "2a8ba7df75215ac23b4a8c7ab5ccf24a930843632372fc59062f9174d6f700da"
 "checksum rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)" = "6d71dacdc3c88c1fde3885a3be3fbab9f35724e6ce99467f7d9c5026132184ca"
 "checksum rand 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "6a6b1679d49b24bbfe0c803429aa1874472f50d9b363131f0e89fc356b544d03"
 "checksum rand_chacha 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "556d3a1ca6600bfcbab7c7c91ccb085ac7fbbcd70e008a98742e7847f4f7bcef"
@@ -2086,10 +2058,9 @@ dependencies = [
 "checksum strum_macros 0.17.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5e6e163a520367c465f59e0a61a23cfae3b10b6546d78b6f672a382be79f7110"
 "checksum syn 0.15.44 (registry+https://github.com/rust-lang/crates.io-index)" = "9ca4b3b69a77cbe1ffc9e198781b7acb0c7365a883670e8f1c1bc66fba79a5c5"
 "checksum syn 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)" = "af6f3550d8dff9ef7dc34d384ac6f107e5d31c8f57d9f28e0081503f547ac8f5"
-"checksum syn-next 1.0.0-rc4 (registry+https://github.com/rust-lang/crates.io-index)" = "efd68e8fbfc53a9f7aa06424fc411090abf190c808ec8aa631b8e458a8f80cc2"
 "checksum tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e24d9338a0a5be79593e2fa15a648add6138caa803e2d5bc782c371732ca9"
-"checksum thespian 0.1.0 (git+https://github.com/randomPoison/thespian?rev=6305b17)" = "<none>"
-"checksum thespian-derive 0.1.0 (git+https://github.com/randomPoison/thespian?rev=6305b17)" = "<none>"
+"checksum thespian 0.1.0 (git+https://github.com/randomPoison/thespian?rev=226378d)" = "<none>"
+"checksum thespian-derive 0.1.0 (git+https://github.com/randomPoison/thespian?rev=226378d)" = "<none>"
 "checksum time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)" = "db8dcfca086c1143c9270ac42a2bbd8a7ee477b78ac8e45b19abfb0cbede4b6f"
 "checksum tokio 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)" = "c1fc73332507b971a5010664991a441b5ee0de92017f5a0e8b00fd684573045b"
 "checksum tokio-macros 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "50a61f268a3db2acee8dcab514efc813dc6dbe8a00e86076f935f94304b59a7a"
