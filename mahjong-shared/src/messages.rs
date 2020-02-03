@@ -14,16 +14,16 @@ pub struct HandshakeRequest {
     pub client_version: Version,
 
     /// The ID and token for the account that the client is attempting to log into.
-    // TODO: Use a more structured type for the account token. For now we'll just use a
-    // psuedo-random string until we have some actual authentication system in place.
-    pub credentials: Option<(AccountId, String)>,
+    pub credentials: Option<Credentials>,
 }
 
 /// Response to a client's handshake request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HandshakeResponse {
     pub server_version: Version,
-    // TODO: Return account data to the client.
+
+    pub new_credentials: Option<Credentials>,
+    pub account_data: PlayerState,
 }
 
 /// Unique ID for a game account.
@@ -37,3 +37,18 @@ pub struct AccountId(u64);
 /// Session IDs are guaranteed to be unique among all active sessions. Once a
 /// session ends, the ID may be reused.
 pub struct SessionId(u32);
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlayerState {
+    /// The points balance for the player, currently the only resource in the game.
+    pub points: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Credentials {
+    pub id: AccountId,
+
+    // TODO: Use a more structured type for the account token. For now we'll just use a
+    // psuedo-random string until we have some actual authentication system in place.
+    pub token: String,
+}

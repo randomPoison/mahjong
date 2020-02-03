@@ -4,6 +4,7 @@ use futures::{
     stream::{SplitSink, SplitStream},
 };
 use mahjong::messages::*;
+use std::collections::HashMap;
 use thespian::*;
 use warp::{filters::ws::Message, ws::WebSocket, Filter};
 
@@ -64,7 +65,7 @@ async fn main() {
 /// This struct simulates the role of a database, acting as central storage of state data for the game.
 #[derive(Debug, Default, Actor)]
 struct GameState {
-    players: Vec<PlayerState>,
+    accounts: HashMap<AccountId, Account>,
 }
 
 impl GameState {
@@ -75,15 +76,9 @@ impl GameState {
 
 #[thespian::actor]
 impl GameState {
-    pub fn create_account(&mut self) -> (AccountId, String) {
+    pub fn create_account(&mut self) -> (Credentials, PlayerState) {
         todo!()
     }
-}
-
-#[derive(Debug)]
-struct PlayerState {
-    /// The points balance for the player, currently the only resource in the game.
-    points: u64,
 }
 
 /// Actor managing an active session with a client.
@@ -100,30 +95,57 @@ impl ClientConnection {
         socket: WebSocket,
         mut game: <GameState as Actor>::Proxy,
     ) -> Result<(ClientConnectionProxy, SplitStream<WebSocket>), HandshakeError> {
-        let (sink, mut stream) = socket.split();
+        let (mut sink, mut stream) = socket.split();
 
+        // Wait for the client to send the handshake.
+        //
+        // TODO: Include a timeout so that we don't wait forever, otherwise this is a vector
+        // for DOS attacks.
         let request = stream
             .next()
             .await
             .ok_or(HandshakeError::ClientDisconnected)??;
 
+        // Parse the request data.
         let request = request
             .to_str()
             .map_err(|_| HandshakeError::InvalidRequest)?;
         let request: HandshakeRequest = serde_json::from_str(request)?;
 
+        // Verify that the client is compatible with the current server version. For now
+        // we only check that the client version matches the server version, which is
+        // enough for development purposes. Once we're in production we may want a more
+        // permissive strategy that allows us to push server updates without invalidating
+        // existing clients.
         let server_version =
             Version::parse(env!("CARGO_PKG_VERSION")).expect("Failed to parse server version");
         if server_version != request.client_version {
             todo!("Handle incompatible client version");
         }
 
-        let account = match request.credentials {
+        // Get account information from the server, creating a new account if the client
+        // did not provide credentials for an existing account.
+        let (credentials, account_data) = match request.credentials {
             Some(..) => todo!("Support logging into an existing account"),
             None => game.create_account().await?,
         };
 
-        todo!("Send response to the client");
+        // Create the response message and send it to the client.
+        let response = HandshakeResponse {
+            server_version,
+            new_credentials: Some(credentials),
+            account_data,
+        };
+        let response =
+            serde_json::to_string(&response).expect("Failed to serialize `HandshakeResponse`");
+        sink.send(Message::text(response)).await?;
+
+        // Create the actor for the client connection and spawn it.
+        let stage = ClientConnection { sink }.into_stage();
+        let client = stage.proxy();
+        tokio::spawn(stage.run());
+
+        Ok((client, stream))
     }
 }
 
@@ -149,6 +171,12 @@ enum HandshakeError {
     Socket(warp::Error),
     Json(serde_json::Error),
     Actor(thespian::MessageError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Account {
+    credentials: Credentials,
+    data: PlayerState,
 }
 
 static INDEX_HTML: &str = r#"
