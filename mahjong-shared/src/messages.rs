@@ -31,6 +31,16 @@ pub struct HandshakeResponse {
 #[repr(transparent)]
 pub struct AccountId(u64);
 
+impl AccountId {
+    /// Creates a new `AccountId` from a numeric ID.
+    ///
+    /// In general, only the server should create new account IDs. Avoid constructing
+    /// new IDs in client code, since there's no guarantee that the ID will be valid.
+    pub fn new(id: u64) -> Self {
+        Self(id)
+    }
+}
+
 /// Unique ID for a client session.
 ///
 /// Each time a new client connects, the server generates an ID for that session.

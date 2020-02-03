@@ -48,7 +48,7 @@ async fn main() {
                         }
                     }
 
-                    todo!("Notify game that client disconnected");
+                    // TODO: Notify game that the client has disconnected.
                 }
             })
         });
@@ -66,6 +66,7 @@ async fn main() {
 #[derive(Debug, Default, Actor)]
 struct GameState {
     accounts: HashMap<AccountId, Account>,
+    account_id_counter: u64,
 }
 
 impl GameState {
@@ -76,8 +77,27 @@ impl GameState {
 
 #[thespian::actor]
 impl GameState {
-    pub fn create_account(&mut self) -> (Credentials, PlayerState) {
-        todo!()
+    pub fn create_account(&mut self) -> Account {
+        // Increment the account ID counter to get the next unused ID.
+        self.account_id_counter += 1;
+
+        // Create the credentials for the new account. For now we generate dummy
+        // credentials, eventually this will be replaced with some system for
+        // generating credentials.
+        let id = AccountId::new(self.account_id_counter);
+        let token = String::from("DUMMY");
+        let credentials = Credentials { id, token };
+
+        // Setup initial state for the account. We'll start players out with 10,000
+        // points because why not.
+        let data = PlayerState { points: 10_000 };
+
+        // Store the new account.
+        let account = Account { credentials, data };
+        let old = self.accounts.insert(id, account.clone());
+        assert!(old.is_none(), "Created duplicate account, id: {:?}", id);
+
+        account
     }
 }
 
@@ -134,7 +154,7 @@ impl ClientConnection {
 
         // Get account information from the server, creating a new account if the client
         // did not provide credentials for an existing account.
-        let (credentials, account_data) = match request.credentials {
+        let account = match request.credentials {
             Some(..) => todo!("Support logging into an existing account"),
             None => game.create_account().await?,
         };
@@ -142,8 +162,8 @@ impl ClientConnection {
         // Create the response message and send it to the client.
         let response = HandshakeResponse {
             server_version,
-            new_credentials: Some(credentials),
-            account_data,
+            new_credentials: Some(account.credentials),
+            account_data: account.data,
         };
         let response =
             serde_json::to_string(&response).expect("Failed to serialize `HandshakeResponse`");
@@ -153,6 +173,8 @@ impl ClientConnection {
         let stage = ClientConnection { sink }.into_stage();
         let client = stage.proxy();
         tokio::spawn(stage.run());
+
+        // TODO: Track the active session in the central game state.
 
         Ok((client, stream))
     }
