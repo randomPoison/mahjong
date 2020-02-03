@@ -97,6 +97,15 @@ impl ClientConnection {
     ) -> Result<(ClientConnectionProxy, SplitStream<WebSocket>), HandshakeError> {
         let (mut sink, mut stream) = socket.split();
 
+        // HACK: Send an initial text message to the client after establishing a
+        // connection. It looks like there's a bug in WebSocketSharp that means it won't
+        // recognize that the connection has been established unit it receives a message,
+        // causing the client to hang. This won't be necessary once we move off of web
+        // sockets.
+        sink.send(Message::text("ping"))
+            .await
+            .expect("Failed to send initial ping");
+
         // Wait for the client to send the handshake.
         //
         // TODO: Include a timeout so that we don't wait forever, otherwise this is a vector

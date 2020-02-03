@@ -16,7 +16,7 @@ public class WebSocket
 
     public void SendString(string str)
     {
-        Send(Encoding.UTF8.GetBytes(str));
+        _socket.Send(str);
     }
 
     public async Task<string> RecvStringAsync()
