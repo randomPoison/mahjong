@@ -15,17 +15,28 @@ public class StartupController : MonoBehaviour
         }
         catch (TaskCanceledException exception)
         {
-            Debug.LogFormat("Main task was canceled: {0}", exception);
+            Debug.LogFormat($"Main task was canceled: {exception}");
         }
     }
 
     private async UniTask DoMainLoop()
     {
         // TODO: Handle an exception being thrown as a result of the connection failing.
+        // TODO: Make server address configurable.
         _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:3030/client"));
 
-        // Send a test message.
-        _socket.SendString("Connected to server!");
+        Debug.Log("Established connection with server, beginning handshake");
+
+        // Perform handshake and initialization sequence with the server:
+        //
+        // * The client sends account ID and initial configuration data.
+        // * Server sends current account data and any updated cache data.
+        var requestString = Mahjong.CreateHandshakeRequest();
+        _socket.SendString(requestString);
+
+        // TODO: Send cached account ID to server, or request new account.
+
+        // TODO: Receive account data from server.
 
         // Once the initial state has been received from the server, spawn two tasks to
         // run concurrently:
@@ -63,10 +74,7 @@ public class StartupController : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (_socket != null)
-        {
-            _socket.Close();
-            _socket = null;
-        }
+        _socket?.Close();
+        _socket = null;
     }
 }

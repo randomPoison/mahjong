@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Collections.Generic;
 #endif
 
+// TODO: Implement IDisposable for WebSocket.
 public class WebSocket
 {
     private readonly Uri _url;
