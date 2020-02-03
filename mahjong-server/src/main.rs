@@ -1,5 +1,9 @@
-use futures::{prelude::*, stream::SplitSink};
-use mahjong::Tile;
+use derive_more::From;
+use futures::{
+    prelude::*,
+    stream::{SplitSink, SplitStream},
+};
+use mahjong::messages::*;
 use thespian::*;
 use warp::{filters::ws::Message, ws::WebSocket, Filter};
 
@@ -7,25 +11,43 @@ use warp::{filters::ws::Message, ws::WebSocket, Filter};
 async fn main() {
     // Create the game state actor and spawn it, holding on to its proxy so that the
     // socket tasks can still communicate with it.
-    let stage = GameState::new(mahjong::generate_tileset()).into_stage();
+    let stage = GameState::new().into_stage();
     let game = stage.proxy();
     tokio::spawn(stage.run());
 
     let client = warp::path("client")
         .and(warp::ws())
         .map(move |ws: warp::ws::Ws| {
-            let mut game = game.clone();
+            let game = game.clone();
             ws.on_upgrade(move |socket| {
                 async move {
-                    let (sink, mut stream) = socket.split();
+                    // Perform the handshake sequence with the client in order to initiate the session.
+                    let (mut client, mut stream) =
+                        match ClientConnection::perform_handshake(socket, game).await {
+                            Ok(result) => result,
 
-                    game.client_connected(ClientConnection { sink })
-                        .await
-                        .expect("Failed to notify game that a client connected");
+                            // Log the failed connection attempt and then disconnect from the client.
+                            Err(err) => {
+                                dbg!(&err);
+                                return;
+                            }
+                        };
 
                     while let Some(message) = stream.next().await {
-                        let _ = dbg!(message);
+                        match message {
+                            Ok(message) => client
+                                .handle_message(message)
+                                .await
+                                .expect("Failed to send message to client actor"),
+
+                            Err(err) => {
+                                dbg!(err);
+                                break;
+                            }
+                        }
                     }
+
+                    todo!("Notify game that client disconnected");
                 }
             })
         });
@@ -37,72 +59,96 @@ async fn main() {
     warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
 }
 
-#[derive(Debug, Actor)]
+/// Central storage of state data for the game.
+///
+/// This struct simulates the role of a database, acting as central storage of state data for the game.
+#[derive(Debug, Default, Actor)]
 struct GameState {
-    tiles: Vec<Tile>,
     players: Vec<PlayerState>,
+}
+
+impl GameState {
+    pub fn new() -> Self {
+        Default::default()
+    }
 }
 
 #[thespian::actor]
 impl GameState {
-    /// Removes the first `count` tiles from the deck and returns them.
-    ///
-    /// If there are fewer than `count` tiles left in the deck, returns an error with the number of remaining tiles.
-    pub fn draw_tiles(&mut self, count: usize) -> Result<Vec<Tile>, usize> {
-        if self.tiles.len() < count {
-            return Err(self.tiles.len());
-        }
-
-        Ok(self.tiles.split_off(self.tiles.len() - count))
-    }
-
-    pub async fn client_connected(&mut self, mut client: ClientConnection) {
-        let hand = self
-            .draw_tiles(13)
-            .expect("Not enough tiles left in deck to draw");
-
-        let message = serde_json::to_string(&hand).expect("Failed to serialize list of tiles");
-        client.send_text(message).await;
-
-        self.players.push(PlayerState {
-            hand,
-            client: Some(client),
-        });
-    }
-}
-
-impl GameState {
-    pub fn new(tiles: Vec<Tile>) -> Self {
-        Self {
-            tiles,
-            players: Vec::new(),
-        }
+    pub fn create_account(&mut self) -> (AccountId, String) {
+        todo!()
     }
 }
 
 #[derive(Debug)]
 struct PlayerState {
-    hand: Vec<Tile>,
-
-    /// The client that's controlling this player. Will be `None` if there is no
-    /// connected client, e.g. if the client disconnected during the game.
-    client: Option<ClientConnection>,
+    /// The points balance for the player, currently the only resource in the game.
+    points: u64,
 }
 
-/// Wrapper around the sender half of the client socket providing a clean api for
-/// sending messages to the client.
-#[derive(Debug)]
+/// Actor managing an active session with a client.
+#[derive(Debug, Actor)]
 struct ClientConnection {
+    /// The sender half of the socket connection with the client.
     sink: SplitSink<WebSocket, Message>,
 }
 
 impl ClientConnection {
-    pub async fn send_text(&mut self, text: String) {
+    /// Attempts to perform the session handshake with the client, returning a new
+    /// `ClientConnection` if it succeeds.
+    async fn perform_handshake(
+        socket: WebSocket,
+        mut game: <GameState as Actor>::Proxy,
+    ) -> Result<(ClientConnectionProxy, SplitStream<WebSocket>), HandshakeError> {
+        let (sink, mut stream) = socket.split();
+
+        let request = stream
+            .next()
+            .await
+            .ok_or(HandshakeError::ClientDisconnected)??;
+
+        let request = request
+            .to_str()
+            .map_err(|_| HandshakeError::InvalidRequest)?;
+        let request: HandshakeRequest = serde_json::from_str(request)?;
+
+        let server_version =
+            Version::parse(env!("CARGO_PKG_VERSION")).expect("Failed to parse server version");
+        if server_version != request.client_version {
+            todo!("Handle incompatible client version");
+        }
+
+        let account = match request.credentials {
+            Some(..) => todo!("Support logging into an existing account"),
+            None => game.create_account().await?,
+        };
+
+        todo!("Send response to the client");
+    }
+}
+
+#[thespian::actor]
+impl ClientConnection {
+    fn handle_message(&mut self, message: Message) {
+        dbg!(message);
+    }
+
+    /// Sends the provided string as a message to the client.
+    async fn send_text(&mut self, text: String) {
         self.sink
             .send(Message::text(text))
             .await
             .expect("Failed to send message to client");
     }
+}
+
+#[derive(Debug, From)]
+enum HandshakeError {
+    ClientDisconnected,
+    InvalidRequest,
+    Socket(warp::Error),
+    Json(serde_json::Error),
+    Actor(thespian::MessageError),
 }
 
 static INDEX_HTML: &str = r#"

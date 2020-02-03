@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 async-std = { version = "1.4.0", features = ["attributes"] }
+derive_more = "0.99.2"
 futures = "0.3.1"
 mahjong = { path = "../mahjong-shared" }
 serde_json = "1.0.45"
