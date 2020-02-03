@@ -1,4 +1,4 @@
-REM @ECHO OFF
+@ECHO OFF
 
 REM Temporary helper script to generate the dylib, generate the C# bindings, and
 REM copy both over to the Unity test project. This helps speed up testing during
@@ -21,4 +21,4 @@ cargo build -p mahjong --target wasm32-unknown-unknown
 cs-bindgen-cli -o mahjong-client/Packages/com.synapse-games.mahjong/Mahjong.cs target/wasm32-unknown-unknown/debug/mahjong.wasm
 
 cargo build
-XCOPY /y "target/debug/mahjong.dll" "mahjong-client/Packages/com.synapse-games.mahjong"
+xcopy /y "target\debug\mahjong.dll" "mahjong-client\Packages\com.synapse-games.mahjong"
