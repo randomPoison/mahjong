@@ -1,4 +1,4 @@
-﻿namespace Synapse.Mahjong
+namespace Synapse.Mahjong
 {
     public class #SCRIPTNAME#
     {
