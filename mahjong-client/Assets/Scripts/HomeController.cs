@@ -1,5 +1,8 @@
 using TMPro;
+using UniRx.Async;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 namespace Synapse.Mahjong
 {
@@ -11,20 +14,35 @@ namespace Synapse.Mahjong
     {
         [SerializeField] private TextMeshProUGUI _accountIdDisplay = null;
         [SerializeField] private TextMeshProUGUI _pointsDisplay = null;
+        [SerializeField] private Button _playButton = null;
 
         private ClientState _state;
+        private Scene _scene;
 
         /// <summary>
         /// Initializes the controller. Must be called immediately upon loading the home
         /// screen in order to correctly initialize the scene.
         /// </summary>
-        /// <param name="state"></param>
+        ///
+        /// <param name="state">
+        /// The <see cref="ClientState"/> object for the current client.
+        /// </param>
         public void Init(ClientState state)
         {
             _state = state;
+            _scene = SceneManager.GetSceneByName("Home");
 
             _accountIdDisplay.text = _state.AccountId().ToString();
             _pointsDisplay.text = _state.Points().ToString();
+
+            _playButton.onClick.AddListener(LoadGameplayScene);
+        }
+
+        private async void LoadGameplayScene()
+        {
+            var unloadTask = SceneManager.UnloadSceneAsync(_scene);
+            var loadTask = SceneManager.LoadSceneAsync("Gameplay", LoadSceneMode.Additive);
+            await UniTask.WhenAll(unloadTask.ToUniTask(), loadTask.ToUniTask());
         }
     }
 }

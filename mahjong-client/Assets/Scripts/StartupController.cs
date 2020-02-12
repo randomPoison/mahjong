@@ -59,6 +59,8 @@ namespace Synapse.Mahjong
                 // Once the home screen has loaded, initialize the home screen controller.
                 var homeController = FindObjectOfType<HomeController>();
                 homeController.Init(_state);
+
+                // TODO: Wait for something to happen I guess?
             }
             catch (TaskCanceledException exception)
             {
