@@ -167,6 +167,7 @@ impl ClientConnection {
         };
         let response =
             serde_json::to_string(&response).expect("Failed to serialize `HandshakeResponse`");
+        dbg!(&response);
         sink.send(Message::text(response)).await?;
 
         // Create the actor for the client connection and spawn it.

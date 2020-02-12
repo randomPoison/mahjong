@@ -39,6 +39,11 @@ impl AccountId {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
+
+    // TODO: Remove this once we can directly pass `AccountId` values to and from C#.
+    pub fn raw(self) -> u64 {
+        self.0
+    }
 }
 
 /// Unique ID for a client session.

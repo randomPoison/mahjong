@@ -6,11 +6,46 @@ using UnityEngine;
 public class StartupController : MonoBehaviour
 {
     private WebSocket _socket;
+    private ClientState _state;
 
     private async void Start()
     {
         try
         {
+            // Create the underlying state data for the client.
+            _state = new ClientState();
+
+            // TODO: Handle an exception being thrown as a result of the connection failing.
+            // TODO: Make server address configurable.
+            _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:3030/client"));
+
+            // HACK: Due to a bug in WebSocketSharp, the first message that we'll receive
+            // when waiting will be the initial ping sent by the server to trigger the
+            // client connection.
+            var pingHack = await _socket.RecvStringAsync();
+            Debug.Assert(pingHack == "ping", $"Received unexpected first message: {pingHack}");
+
+            Debug.Log("Established connection with server, beginning handshake");
+
+            // TODO: Load any cached credentials and add them to the client state.
+
+            // Perform handshake and initialization sequence with the server:
+            //
+            // * The client sends account ID and initial configuration data.
+            // * Server sends current account data and any updated cache data.
+            _socket.SendString(_state.CreateHandshakeRequest());
+            if (!_state.HandleHandshakeResponse(await _socket.RecvStringAsync()))
+            {
+                // TODO: Add better handling for the case where we failed to connect to
+                // the server. Obviously we need better error handling coming from the
+                // Rust side, be we should probably have some option for the player to
+                // re-attempt the connection.
+                Debug.LogError("Handshake with server failed :'(");
+                return;
+            }
+
+            Debug.Log($"Handshake completed, account ID: {_state.AccountId()}, points balance: {_state.Points()}");
+
             await DoMainLoop();
         }
         catch (TaskCanceledException exception)
@@ -21,22 +56,6 @@ public class StartupController : MonoBehaviour
 
     private async UniTask DoMainLoop()
     {
-        // TODO: Handle an exception being thrown as a result of the connection failing.
-        // TODO: Make server address configurable.
-        _socket = await WebSocket.ConnectAsync(new Uri("ws://localhost:3030/client"));
-
-        Debug.Log("Established connection with server, beginning handshake");
-
-        // Perform handshake and initialization sequence with the server:
-        //
-        // * The client sends account ID and initial configuration data.
-        // * Server sends current account data and any updated cache data.
-        var requestString = Mahjong.CreateHandshakeRequest();
-        _socket.SendString(requestString);
-
-        // TODO: Send cached account ID to server, or request new account.
-
-        // TODO: Receive account data from server.
 
         // Once the initial state has been received from the server, spawn two tasks to
         // run concurrently:
@@ -76,5 +95,8 @@ public class StartupController : MonoBehaviour
     {
         _socket?.Close();
         _socket = null;
+
+        _state?.Dispose();
+        _state = null;
     }
 }

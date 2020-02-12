@@ -8,7 +8,7 @@ edition = "2018"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-cs-bindgen = { version = "0.1", path = "../../cs-bindgen/cs-bindgen" }
+cs-bindgen = { git = "https://github.com/randomPoison/cs-bindgen", rev = "627fb4c" }
 derive_more = "0.99.2"
 semver = { version = "0.9.0", features = ["serde"] }
 serde = { version = "1.0.104", features = ["derive"] }
