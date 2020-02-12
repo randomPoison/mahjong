@@ -1,12 +1,12 @@
-use derive_more::From;
-use futures::{
-    prelude::*,
-    stream::{SplitSink, SplitStream},
-};
-use mahjong::messages::*;
+use crate::{client::ClientController, game::*};
+use futures::prelude::*;
+use mahjong::{game::*, messages::*};
 use std::collections::HashMap;
 use thespian::*;
-use warp::{filters::ws::Message, ws::WebSocket, Filter};
+use warp::Filter;
+
+mod client;
+mod game;
 
 #[tokio::main]
 async fn main() {
@@ -24,7 +24,7 @@ async fn main() {
                 async move {
                     // Perform the handshake sequence with the client in order to initiate the session.
                     let (mut client, mut stream) =
-                        match ClientConnection::perform_handshake(socket, game).await {
+                        match ClientController::perform_handshake(socket, game).await {
                             Ok(result) => result,
 
                             // Log the failed connection attempt and then disconnect from the client.
@@ -36,10 +36,15 @@ async fn main() {
 
                     while let Some(message) = stream.next().await {
                         match message {
-                            Ok(message) => client
-                                .handle_message(message)
-                                .await
-                                .expect("Failed to send message to client actor"),
+                            Ok(message) => {
+                                let result = client
+                                    .handle_message(message)
+                                    .await
+                                    .expect("Failed to communicate with client actor");
+                                if let Err(err) = result {
+                                    println!("Error handling client message: {:?}", err);
+                                }
+                            }
 
                             Err(err) => {
                                 dbg!(err);
@@ -64,9 +69,10 @@ async fn main() {
 ///
 /// This struct simulates the role of a database, acting as central storage of state data for the game.
 #[derive(Debug, Default, Actor)]
-struct GameState {
+pub struct GameState {
     accounts: HashMap<AccountId, Account>,
     account_id_counter: u64,
+    match_id_counter: u32,
 }
 
 impl GameState {
@@ -80,11 +86,11 @@ impl GameState {
     pub fn create_account(&mut self) -> Account {
         // Increment the account ID counter to get the next unused ID.
         self.account_id_counter += 1;
+        let id = AccountId::new(self.account_id_counter);
 
         // Create the credentials for the new account. For now we generate dummy
         // credentials, eventually this will be replaced with some system for
         // generating credentials.
-        let id = AccountId::new(self.account_id_counter);
         let token = String::from("DUMMY");
         let credentials = Credentials { id, token };
 
@@ -99,114 +105,21 @@ impl GameState {
 
         account
     }
-}
 
-/// Actor managing an active session with a client.
-#[derive(Debug, Actor)]
-struct ClientConnection {
-    /// The sender half of the socket connection with the client.
-    sink: SplitSink<WebSocket, Message>,
-}
+    pub fn start_match(&mut self) -> MatchControllerProxy {
+        self.match_id_counter += 1;
+        let id = MatchId::new(self.match_id_counter);
 
-impl ClientConnection {
-    /// Attempts to perform the session handshake with the client, returning a new
-    /// `ClientConnection` if it succeeds.
-    async fn perform_handshake(
-        socket: WebSocket,
-        mut game: <GameState as Actor>::Proxy,
-    ) -> Result<(ClientConnectionProxy, SplitStream<WebSocket>), HandshakeError> {
-        let (mut sink, mut stream) = socket.split();
-
-        // HACK: Send an initial text message to the client after establishing a
-        // connection. It looks like there's a bug in WebSocketSharp that means it won't
-        // recognize that the connection has been established unit it receives a message,
-        // causing the client to hang. This won't be necessary once we move off of web
-        // sockets.
-        sink.send(Message::text("ping"))
-            .await
-            .expect("Failed to send initial ping");
-
-        // Wait for the client to send the handshake.
-        //
-        // TODO: Include a timeout so that we don't wait forever, otherwise this is a vector
-        // for DOS attacks.
-        let request = stream
-            .next()
-            .await
-            .ok_or(HandshakeError::ClientDisconnected)??;
-
-        // Parse the request data.
-        let request = request
-            .to_str()
-            .map_err(|_| HandshakeError::InvalidRequest)?;
-        let request: HandshakeRequest = serde_json::from_str(request)?;
-
-        // Verify that the client is compatible with the current server version. For now
-        // we only check that the client version matches the server version, which is
-        // enough for development purposes. Once we're in production we may want a more
-        // permissive strategy that allows us to push server updates without invalidating
-        // existing clients.
-        let server_version =
-            Version::parse(env!("CARGO_PKG_VERSION")).expect("Failed to parse server version");
-        if server_version != request.client_version {
-            todo!("Handle incompatible client version");
-        }
-
-        // Get account information from the server, creating a new account if the client
-        // did not provide credentials for an existing account.
-        let account = match request.credentials {
-            Some(..) => todo!("Support logging into an existing account"),
-            None => game.create_account().await?,
-        };
-
-        // Create the response message and send it to the client.
-        let response = HandshakeResponse {
-            server_version,
-            new_credentials: Some(account.credentials),
-            account_data: account.data,
-        };
-        let response =
-            serde_json::to_string(&response).expect("Failed to serialize `HandshakeResponse`");
-        dbg!(&response);
-        sink.send(Message::text(response)).await?;
-
-        // Create the actor for the client connection and spawn it.
-        let stage = ClientConnection { sink }.into_stage();
-        let client = stage.proxy();
+        let stage = MatchController::new(id).into_stage();
+        let proxy = stage.proxy();
         tokio::spawn(stage.run());
 
-        // TODO: Track the active session in the central game state.
-
-        Ok((client, stream))
+        proxy
     }
-}
-
-#[thespian::actor]
-impl ClientConnection {
-    fn handle_message(&mut self, message: Message) {
-        dbg!(message);
-    }
-
-    /// Sends the provided string as a message to the client.
-    async fn send_text(&mut self, text: String) {
-        self.sink
-            .send(Message::text(text))
-            .await
-            .expect("Failed to send message to client");
-    }
-}
-
-#[derive(Debug, From)]
-enum HandshakeError {
-    ClientDisconnected,
-    InvalidRequest,
-    Socket(warp::Error),
-    Json(serde_json::Error),
-    Actor(thespian::MessageError),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Account {
+pub struct Account {
     credentials: Credentials,
     data: PlayerState,
 }

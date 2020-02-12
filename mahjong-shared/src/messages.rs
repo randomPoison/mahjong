@@ -51,6 +51,8 @@ impl AccountId {
 /// Each time a new client connects, the server generates an ID for that session.
 /// Session IDs are guaranteed to be unique among all active sessions. Once a
 /// session ends, the ID may be reused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct SessionId(u32);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -66,4 +68,9 @@ pub struct Credentials {
     // TODO: Use a more structured type for the account token. For now we'll just use a
     // psuedo-random string until we have some actual authentication system in place.
     pub token: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ClientRequest {
+    StartMatch,
 }
