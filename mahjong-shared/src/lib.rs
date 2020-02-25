@@ -2,11 +2,10 @@ pub mod game;
 pub mod messages;
 pub mod tile;
 
-use crate::messages::{Credentials, HandshakeRequest, HandshakeResponse, PlayerState, Version};
+use crate::{game::*, messages::*};
 use cs_bindgen::prelude::*;
-use messages::AccountId;
 
-cs_bindgen::generate_static_bindings!();
+cs_bindgen::export!();
 
 #[cs_bindgen]
 #[derive(Debug, Clone, Default)]
@@ -17,7 +16,7 @@ pub struct ClientState {
 
 #[cs_bindgen]
 impl ClientState {
-    pub fn new() -> Self {
+    pub fn new() -> ClientState {
         Default::default()
     }
 
@@ -65,6 +64,18 @@ impl ClientState {
                 false
             }
         }
+    }
+
+    pub fn create_start_match_request(&self) -> String {
+        let request = ClientRequest::StartMatch;
+        serde_json::to_string(&request).expect("Failed to serialize request")
+    }
+
+    pub fn handle_start_match_response(&self, response: String) -> Match {
+        let response = serde_json::from_str::<StartMatchResponse>(&response)
+            .expect("Failed to deserialize `StartMatchResponse`");
+
+        response.state
     }
 
     pub fn account_id(&self) -> u64 {

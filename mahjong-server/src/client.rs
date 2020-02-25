@@ -111,11 +111,19 @@ impl ClientController {
                 // TODO: Do an error if the client is already in a match (or would otherwise not be
                 // able to start a match).
 
-                let controller = self
+                let mut controller = self
                     .game
                     .start_match()
                     .await
                     .expect("Failed to start match");
+
+                let state = controller
+                    .state()
+                    .await
+                    .expect("Failed to get initial state from match controller");
+                let response = serde_json::to_string(&StartMatchResponse { state })
+                    .expect("Failed to serialize `StartMatchResponse`");
+                self.send_text(response).await;
 
                 self.state = ClientState::InMatch { controller };
             }

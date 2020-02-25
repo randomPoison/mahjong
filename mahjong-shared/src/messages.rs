@@ -1,3 +1,4 @@
+use crate::game::Match;
 use serde::{Deserialize, Serialize};
 
 pub use semver::Version;
@@ -51,7 +52,7 @@ impl AccountId {
 /// Each time a new client connects, the server generates an ID for that session.
 /// Session IDs are guaranteed to be unique among all active sessions. Once a
 /// session ends, the ID may be reused.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct SessionId(u32);
 
@@ -73,4 +74,9 @@ pub struct Credentials {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ClientRequest {
     StartMatch,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StartMatchResponse {
+    pub state: Match,
 }
