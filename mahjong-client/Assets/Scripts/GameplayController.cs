@@ -29,5 +29,11 @@ namespace Synapse.Mahjong
             _state = _client.HandleStartMatchResponse(responseJson);
             Debug.Log($"Started match, ID: {_state.Id()}", this);
         }
+
+        private void OnDestroy()
+        {
+            _state?.Dispose();
+            _state = null;
+        }
     }
 }
