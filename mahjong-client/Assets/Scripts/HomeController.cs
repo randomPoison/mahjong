@@ -1,4 +1,4 @@
-using TMPro;
+﻿using TMPro;
 using UniRx.Async;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -16,6 +16,7 @@ namespace Synapse.Mahjong
         [SerializeField] private TextMeshProUGUI _pointsDisplay = null;
         [SerializeField] private Button _playButton = null;
 
+        private WebSocket _socket;
         private ClientState _state;
         private Scene _scene;
 
@@ -27,9 +28,10 @@ namespace Synapse.Mahjong
         /// <param name="state">
         /// The <see cref="ClientState"/> object for the current client.
         /// </param>
-        public void Init(ClientState state)
+        public void Init(ClientState state, WebSocket socket)
         {
             _state = state;
+            _socket = socket;
             _scene = SceneManager.GetSceneByName("Home");
 
             _accountIdDisplay.text = _state.AccountId().ToString();
@@ -43,6 +45,9 @@ namespace Synapse.Mahjong
             var unloadTask = SceneManager.UnloadSceneAsync(_scene);
             var loadTask = SceneManager.LoadSceneAsync("Gameplay", LoadSceneMode.Additive);
             await UniTask.WhenAll(unloadTask.ToUniTask(), loadTask.ToUniTask());
+
+            // Initialize the scene controller.
+            FindObjectOfType<GameplayController>().Init(_state, _socket);
         }
     }
 }
