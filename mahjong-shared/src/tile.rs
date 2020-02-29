@@ -1,3 +1,4 @@
+use cs_bindgen::prelude::*;
 use derive_more::*;
 use serde::*;
 use strum::*;
@@ -9,6 +10,7 @@ pub enum Tile {
     Honor(HonorTile),
 }
 
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
 pub enum Suit {
     Coins,
@@ -16,6 +18,7 @@ pub enum Suit {
     Characters,
 }
 
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SimpleTile {
     pub number: u8,
@@ -28,6 +31,7 @@ pub enum BonusTile {
     Season(Season),
 }
 
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
 pub enum Flower {
     PlumBlossom,
@@ -36,6 +40,7 @@ pub enum Flower {
     Bamboo,
 }
 
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
 pub enum Season {
     Spring,
@@ -50,6 +55,7 @@ pub enum HonorTile {
     Dragon(Dragon),
 }
 
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
 pub enum Wind {
     East,
@@ -58,6 +64,7 @@ pub enum Wind {
     North,
 }
 
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
 pub enum Dragon {
     Red,
