@@ -3,6 +3,7 @@ use derive_more::*;
 use serde::*;
 use strum::*;
 
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, From, Serialize, Deserialize)]
 pub enum Tile {
     Simple(SimpleTile),
@@ -25,6 +26,7 @@ pub struct SimpleTile {
     pub suit: Suit,
 }
 
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, From, Serialize, Deserialize)]
 pub enum BonusTile {
     Flower(Flower),
@@ -49,6 +51,7 @@ pub enum Season {
     Winter,
 }
 
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, From, Serialize, Deserialize)]
 pub enum HonorTile {
     Wind(Wind),

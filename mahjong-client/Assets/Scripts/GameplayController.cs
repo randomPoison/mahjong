@@ -28,6 +28,23 @@ namespace Synapse.Mahjong
             // until we can return more structured data from Rust functions.
             _state = _client.HandleStartMatchResponse(responseJson);
             Debug.Log($"Started match, ID: {_state.Id()}", this);
+
+            var tile = _state.GetPlayerTile(0, 0);
+            switch (tile)
+            {
+                case Tile.Simple simple:
+                    Debug.Log("Player's tile is a simple tile");
+                    break;
+
+
+                case Tile.Bonus bonus:
+                    Debug.Log("Player's tile is a bonus tile");
+                    break;
+
+                case Tile.Honor honor:
+                    Debug.Log("Player's tile is a honor tile");
+                    break;
+            }
         }
 
         private void OnDestroy()

@@ -38,6 +38,11 @@ impl Match {
         // TODO: Directly return the value once cs-bindgen supports doing so.
         self.id.raw()
     }
+
+    // TODO: Change this parameter to `usize` once its supported by cs-bindgen.
+    pub fn get_player_tile(&self, player: i32, tile: i32) -> Tile {
+        self.players[player as usize].hand[tile as usize]
+    }
 }
 
 /// Unique identifier for an active match.
@@ -58,6 +63,7 @@ impl MatchId {
 }
 
 /// Player state within a match.
+#[cs_bindgen]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Player {
     /// The client session controlling this player in the match, if any.
