@@ -66,7 +66,7 @@ namespace Synapse.Mahjong
                                     break;
 
                                 case HonorTile.Wind wind:
-                                    Debug.Log($"Tile @ {wind} #{index}: {wind.Element0} Wind");
+                                    Debug.Log($"Tile @ {seat} #{index}: {wind.Element0} Wind");
                                     break;
                             }
                             break;

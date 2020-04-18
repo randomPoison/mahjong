@@ -2,9 +2,11 @@
 
 use crate::{messages::SessionId, tile::*};
 use cs_bindgen::prelude::*;
+use fehler::{throw, throws};
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
+use thiserror::Error;
 
 #[cs_bindgen]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +33,37 @@ impl Match {
             wall: tiles,
         }
     }
+
+    /// Draws `count` tiles from the wall directly into a player's hand.
+    ///
+    /// If there are fewer than `count` tiles left in the wall, no tiles are drawn.
+    #[throws(InsufficientTiles)]
+    pub fn draw_for_player(&mut self, seat: Wind, count: usize) {
+        let player = self.players.get_mut(&seat).unwrap();
+
+        // Check if there are enough tiles for the draw before actually drawing any, that
+        // way we don't have a partially-completed draw if there aren't enough tiles left.
+        if self.wall.len() < count {
+            throw!(InsufficientTiles::new(self.wall.len(), count));
+        }
+
+        for _ in 0..count {
+            player.hand.push(self.wall.pop().unwrap());
+        }
+    }
+
+    /// Draws the next tile from the wall and puts it in a player's draw slot.
+    #[throws(InsufficientTiles)]
+    pub fn draw_into_hand(&mut self, seat: Wind) {
+        let player = self.players.get_mut(&seat).unwrap();
+
+        let tile = self
+            .wall
+            .pop()
+            .ok_or(InsufficientTiles::new(self.wall.len(), 1))?;
+
+        player.current_draw = Some(tile);
+    }
 }
 
 #[cs_bindgen]
@@ -40,9 +73,22 @@ impl Match {
         self.id.raw()
     }
 
-    // TODO: Make the return type `&[Tile]` once we support returning slices.
+    // TODO: Make the return type `&[Tile]` once cs-bindgen supports returning slices.
     pub fn get_player_hand(&self, seat: Wind) -> Vec<Tile> {
         self.players.get(&seat).unwrap().hand.clone()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Error)]
+#[error("Not enough tiles in wall for draw: {needed} tiles requested, but only {remaining} left")]
+pub struct InsufficientTiles {
+    remaining: usize,
+    needed: usize,
+}
+
+impl InsufficientTiles {
+    pub fn new(remaining: usize, needed: usize) -> Self {
+        Self { remaining, needed }
     }
 }
 

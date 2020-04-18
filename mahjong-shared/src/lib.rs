@@ -1,9 +1,14 @@
+use crate::{game::*, messages::*};
+use cs_bindgen::prelude::*;
+
+// Re-export any crates that we also want to use on the server side. This has the
+// dual benefits of making it so that we don't need to declare the dependency twice,
+// and ensuring that both crates use the same versions of any shared dependencies.
+pub use strum;
+
 pub mod game;
 pub mod messages;
 pub mod tile;
-
-use crate::{game::*, messages::*};
-use cs_bindgen::prelude::*;
 
 cs_bindgen::export!();
 
