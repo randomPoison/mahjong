@@ -1,14 +1,29 @@
 ﻿using Synapse.Utils;
 using UnityEngine;
+using UnityEngine.AddressableAssets;
 
 namespace Synapse.Mahjong
 {
     /// <summary>
     /// Main controller for the mahjong gameplay.
     /// </summary>
-    public class GameplayController : MonoBehaviour
+    public class MatchController : MonoBehaviour
     {
-        [SerializeField] private Transform _boardObject = null;
+        [SerializeField]
+        [Tooltip(
+            "The root object for each player's hand. Tiles in each players' hand will " +
+            "be made children of these objects.")]
+        private Transform[] _handRoots = default;
+
+        // TODO: Move the tile asset configuration into a scriptable object. While we
+        // only have one set of tile assets we can get away with baking it directly into
+        // the controller, but this setup won't scale.
+        [Header("Tile Assets")]
+        [SerializeField] private AssetReference[] _bambooTiles = default;
+        [SerializeField] private AssetReference[] _circleTiles = default;
+        [SerializeField] private AssetReference[] _characterTiles = default;
+        [SerializeField] private AssetReference[] _dragonTiles = default;
+        [SerializeField] private AssetReference[] _windTiles = default;
 
         private WebSocket _socket;
         private ClientState _client;
@@ -29,7 +44,6 @@ namespace Synapse.Mahjong
             // until we can return more structured data from Rust functions.
             _state = _client.HandleStartMatchResponse(responseJson);
             Debug.Log($"Started match, ID: {_state.Id()}", this);
-
 
             foreach (var seat in EnumUtils.GetValues<Wind>())
             {

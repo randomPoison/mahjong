@@ -47,7 +47,7 @@ namespace Synapse.Mahjong
             await UniTask.WhenAll(unloadTask.ToUniTask(), loadTask.ToUniTask());
 
             // Initialize the scene controller.
-            FindObjectOfType<GameplayController>().Init(_state, _socket);
+            FindObjectOfType<MatchController>().Init(_state, _socket);
         }
     }
 }
