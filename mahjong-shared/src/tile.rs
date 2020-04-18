@@ -7,8 +7,25 @@ use strum::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, From, Serialize, Deserialize)]
 pub enum Tile {
     Simple(SimpleTile),
-    Bonus(BonusTile),
-    Honor(HonorTile),
+    Wind(Wind),
+    Dragon(Dragon),
+}
+
+impl Tile {
+    pub fn is_honor(self) -> bool {
+        match self {
+            Tile::Wind(..) | Tile::Dragon(..) => true,
+            Tile::Simple(..) => false,
+        }
+    }
+
+    pub fn as_honor(self) -> Option<HonorTile> {
+        match self {
+            Tile::Wind(wind) => Some(HonorTile::Wind(wind)),
+            Tile::Dragon(dragon) => Some(HonorTile::Dragon(dragon)),
+            Tile::Simple(..) => None,
+        }
+    }
 }
 
 #[cs_bindgen]
@@ -24,31 +41,6 @@ pub enum Suit {
 pub struct SimpleTile {
     pub number: u8,
     pub suit: Suit,
-}
-
-#[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, From, Serialize, Deserialize)]
-pub enum BonusTile {
-    Flower(Flower),
-    Season(Season),
-}
-
-#[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
-pub enum Flower {
-    PlumBlossom,
-    Orchid,
-    Chrysanthemum,
-    Bamboo,
-}
-
-#[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
-pub enum Season {
-    Spring,
-    Summer,
-    Autumn,
-    Winter,
 }
 
 #[cs_bindgen]
@@ -100,27 +92,14 @@ pub fn generate_tileset() -> Vec<Tile> {
 
     for dragon in Dragon::iter() {
         for _ in 0..4 {
-            tiles.push(HonorTile::Dragon(dragon).into());
+            tiles.push(dragon.into());
         }
     }
 
     for wind in Wind::iter() {
         for _ in 0..4 {
-            tiles.push(HonorTile::Wind(wind).into());
+            tiles.push(wind.into());
         }
-    }
-
-    // Add the bonus tiles:
-    //
-    // * There are flower and wind bonus tiles.
-    // * There is only one of each bonus tile.
-
-    for flower in Flower::iter() {
-        tiles.push(BonusTile::Flower(flower).into());
-    }
-
-    for season in Season::iter() {
-        tiles.push(BonusTile::Season(season).into());
     }
 
     tiles

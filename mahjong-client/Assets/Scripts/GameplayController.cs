@@ -44,31 +44,12 @@ namespace Synapse.Mahjong
                             Debug.Log($"Tile @ {seat} #{index}: {simple.Element0.Number} of {simple.Element0.Suit}");
                             break;
 
-                        case Tile.Bonus bonus:
-                            switch (bonus.Element0)
-                            {
-                                case BonusTile.Flower flower:
-                                    Debug.Log($"Tile @ {seat} #{index}: {flower.Element0}");
-                                    break;
-
-                                case BonusTile.Season season:
-                                    Debug.Log($"Tile @ {seat} #{index}: {season.Element0}");
-                                    break;
-                            }
-
+                        case Tile.Dragon dragon:
+                            Debug.Log($"Tile @ {seat} #{index}: {dragon.Element0} Dragon");
                             break;
 
-                        case Tile.Honor honor:
-                            switch (honor.Element0)
-                            {
-                                case HonorTile.Dragon dragon:
-                                    Debug.Log($"Tile @ {seat} #{index}: {dragon.Element0} Dragon");
-                                    break;
-
-                                case HonorTile.Wind wind:
-                                    Debug.Log($"Tile @ {seat} #{index}: {wind.Element0} Wind");
-                                    break;
-                            }
+                        case Tile.Wind wind:
+                            Debug.Log($"Tile @ {seat} #{index}: {wind.Element0} Wind");
                             break;
                     }
                 }
