@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using Synapse.Utils;
+using UnityEngine;
 
 namespace Synapse.Mahjong
 {
@@ -29,21 +30,48 @@ namespace Synapse.Mahjong
             _state = _client.HandleStartMatchResponse(responseJson);
             Debug.Log($"Started match, ID: {_state.Id()}", this);
 
-            var tile = _state.GetPlayerTile(0, 0);
-            switch (tile)
+
+            foreach (var seat in EnumUtils.GetValues<Wind>())
             {
-                case Tile.Simple simple:
-                    Debug.Log("Player's tile is a simple tile");
-                    break;
+                var tiles = _state.GetPlayerHand(seat);
+                Debug.Log($"Tiles @ {seat}: {tiles.Count}");
 
+                foreach (var (index, tile) in tiles.Enumerate())
+                {
+                    switch (tile)
+                    {
+                        case Tile.Simple simple:
+                            Debug.Log($"Tile @ {seat} #{index}: {simple.Element0.Number} of {simple.Element0.Suit}");
+                            break;
 
-                case Tile.Bonus bonus:
-                    Debug.Log("Player's tile is a bonus tile");
-                    break;
+                        case Tile.Bonus bonus:
+                            switch (bonus.Element0)
+                            {
+                                case BonusTile.Flower flower:
+                                    Debug.Log($"Tile @ {seat} #{index}: {flower.Element0}");
+                                    break;
 
-                case Tile.Honor honor:
-                    Debug.Log("Player's tile is a honor tile");
-                    break;
+                                case BonusTile.Season season:
+                                    Debug.Log($"Tile @ {seat} #{index}: {season.Element0}");
+                                    break;
+                            }
+
+                            break;
+
+                        case Tile.Honor honor:
+                            switch (honor.Element0)
+                            {
+                                case HonorTile.Dragon dragon:
+                                    Debug.Log($"Tile @ {seat} #{index}: {dragon.Element0} Dragon");
+                                    break;
+
+                                case HonorTile.Wind wind:
+                                    Debug.Log($"Tile @ {wind} #{index}: {wind.Element0} Wind");
+                                    break;
+                            }
+                            break;
+                    }
+                }
             }
         }
 

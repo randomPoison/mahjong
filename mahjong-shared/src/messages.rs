@@ -1,4 +1,5 @@
 use crate::game::Match;
+use cs_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
 
 pub use semver::Version;
@@ -28,6 +29,7 @@ pub struct HandshakeResponse {
 }
 
 /// Unique ID for a game account.
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct AccountId(u64);
@@ -52,16 +54,19 @@ impl AccountId {
 /// Each time a new client connects, the server generates an ID for that session.
 /// Session IDs are guaranteed to be unique among all active sessions. Once a
 /// session ends, the ID may be reused.
+#[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct SessionId(u32);
 
+#[cs_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlayerState {
     /// The points balance for the player, currently the only resource in the game.
     pub points: u64,
 }
 
+#[cs_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Credentials {
     pub id: AccountId,
