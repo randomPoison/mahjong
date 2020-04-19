@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
+using System.Threading;
 
 #if UNITY_WEBGL && !UNITY_EDITOR
 using System.Collections;
@@ -19,9 +20,9 @@ public class WebSocket
         _socket.Send(str);
     }
 
-    public async Task<string> RecvStringAsync()
+    public async Task<string> RecvStringAsync(CancellationToken cancellation = default)
     {
-        var bytes = await RecvAsync();
+        var bytes = await RecvAsync(cancellation);
         return Encoding.UTF8.GetString(bytes);
     }
 
@@ -191,7 +192,7 @@ public class WebSocket
     /// therefor safe to call this method multiple times without waiting for each to
     /// task to resolve.
     /// </remarks>
-    public Task<byte[]> RecvAsync()
+    public Task<byte[]> RecvAsync(CancellationToken cancellation = default)
     {
         // If we've already received a message that hasn't been dispatched, immediately resolve
         // the task with the first message in the queue. Otherwise, create a TaskCompletionSource
@@ -203,6 +204,7 @@ public class WebSocket
         else
         {
             var completion = new TaskCompletionSource<byte[]>();
+            cancellation.Register(() => completion.SetCanceled());
             _pendingTasks.Enqueue(completion);
             return completion.Task;
         }
