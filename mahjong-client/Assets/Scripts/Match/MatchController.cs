@@ -7,13 +7,15 @@ using UniRx.Async;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 
-namespace Synapse.Mahjong
+namespace Synapse.Mahjong.Match
 {
     /// <summary>
     /// Main controller for the mahjong gameplay.
     /// </summary>
     public class MatchController : MonoBehaviour
     {
+        #region Constants
+
         // TODO: Figure out a better way to track tile dimensions. This should likely be
         // tracked along with the tile asset set, once we move the tile set to a custom
         // asset.
@@ -22,11 +24,15 @@ namespace Synapse.Mahjong
         private const float LeftSide = TileWidth * TilesInAHand * -0.5f;
         private const int TilesInAHand = 13;
 
+        #endregion
+
+        #region Configuration Fields
+
         [SerializeField]
         [Tooltip(
             "The root object for each player's hand. Tiles in each players' hand will " +
             "be made children of these objects.")]
-        private Transform[] _handRoots = default;
+        private PlayerHand[] _hands = default;
 
         // TODO: Move the tile asset configuration into a scriptable object. While we
         // only have one set of tile assets we can get away with baking it directly into
@@ -38,9 +44,13 @@ namespace Synapse.Mahjong
         [SerializeField] private AssetReferenceGameObject[] _dragonTiles = default;
         [SerializeField] private AssetReferenceGameObject[] _windTiles = default;
 
+        #endregion
+
+        #region Private Fields
+
         private WebSocket _socket;
         private ClientState _client;
-        private Match _state;
+        private MatchState _state;
 
         // Cached prefabs for the different tiles. These are populated during startup
         // based on the asset references configured above.
@@ -49,6 +59,8 @@ namespace Synapse.Mahjong
         private GameObject[] _characterPrefabs = new GameObject[9];
         private GameObject[] _dragonPrefabs = new GameObject[3];
         private GameObject[] _windPrefabs = new GameObject[4];
+
+        #endregion
 
         public async void Init(ClientState client, WebSocket socket)
         {
@@ -66,7 +78,7 @@ namespace Synapse.Mahjong
             // starting hand.
             foreach (var seat in EnumUtils.GetValues<Wind>())
             {
-                var handRoot = _handRoots[(int)seat];
+                var hand = _hands[(int)seat];
                 var tiles = _state.GetPlayerHand(seat);
 
                 foreach (var (index, tile) in tiles.Enumerate())
@@ -77,11 +89,20 @@ namespace Synapse.Mahjong
 
                     // Make the tile a child of the root object for the player's hand,
                     // and position it horizontally.
-                    tileObject.transform.SetParent(handRoot, false);
+                    tileObject.transform.SetParent(hand.HandRoot, false);
                     tileObject.transform.localPosition = new Vector3(
                         LeftSide + TileWidth * index,
                         0f,
                         0f);
+                }
+
+                if (_state.PlayerHasCurrentDraw(seat))
+                {
+                    var currentDraw = _state.GetCurrentDraw(seat);
+                    var prefab = GetTilePrefab(currentDraw);
+
+                    var tileObject = Instantiate(prefab);
+                    tileObject.transform.SetParent(hand.DrawTileAnchor, false);
                 }
             }
         }

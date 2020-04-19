@@ -1,4 +1,5 @@
-﻿using TMPro;
+﻿using Synapse.Mahjong.Match;
+using TMPro;
 using UniRx.Async;
 using UnityEngine;
 using UnityEngine.SceneManagement;

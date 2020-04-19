@@ -9,7 +9,7 @@ use tile::Wind;
 #[derive(Debug, Actor)]
 pub struct MatchController {
     rng: Pcg64Mcg,
-    state: Match,
+    state: MatchState,
 
     /// Mapping of which client controls which player seat. Key is the index of the
     clients: HashMap<usize, ClientControllerProxy>,
@@ -23,7 +23,7 @@ impl MatchController {
         let mut tiles = tile::generate_tileset();
         tiles.shuffle(&mut rng);
 
-        let mut state = Match::new(id, tiles);
+        let mut state = MatchState::new(id, tiles);
 
         // Deal each player their initial 13 tiles.
         for seat in Wind::iter() {
@@ -43,7 +43,7 @@ impl MatchController {
 
 #[thespian::actor]
 impl MatchController {
-    pub fn state(&self) -> Match {
+    pub fn state(&self) -> MatchState {
         self.state.clone()
     }
 }

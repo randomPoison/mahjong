@@ -1,4 +1,4 @@
-use crate::game::Match;
+use crate::game::MatchState;
 use cs_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -83,5 +83,5 @@ pub enum ClientRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartMatchResponse {
-    pub state: Match,
+    pub state: MatchState,
 }

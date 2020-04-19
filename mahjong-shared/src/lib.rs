@@ -76,7 +76,7 @@ impl ClientState {
         serde_json::to_string(&request).expect("Failed to serialize request")
     }
 
-    pub fn handle_start_match_response(&self, response: String) -> Match {
+    pub fn handle_start_match_response(&self, response: String) -> MatchState {
         let response = serde_json::from_str::<StartMatchResponse>(&response)
             .expect("Failed to deserialize `StartMatchResponse`");
 

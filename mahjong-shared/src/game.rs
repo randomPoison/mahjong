@@ -10,7 +10,7 @@ use thiserror::Error;
 
 #[cs_bindgen]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Match {
+pub struct MatchState {
     pub id: MatchId,
     pub players: HashMap<Wind, Player>,
 
@@ -18,7 +18,7 @@ pub struct Match {
     pub wall: Vec<Tile>,
 }
 
-impl Match {
+impl MatchState {
     pub fn new(id: MatchId, tiles: Vec<Tile>) -> Self {
         Self {
             id,
@@ -32,6 +32,10 @@ impl Match {
             // TODO: Split the dead wall from the live wall and draw out an initial hand.
             wall: tiles,
         }
+    }
+
+    pub fn player(&self, seat: Wind) -> &Player {
+        self.players.get(&seat).unwrap()
     }
 
     /// Draws `count` tiles from the wall directly into a player's hand.
@@ -67,7 +71,7 @@ impl Match {
 }
 
 #[cs_bindgen]
-impl Match {
+impl MatchState {
     pub fn id(&self) -> u32 {
         // TODO: Directly return the value once cs-bindgen supports doing so.
         self.id.raw()
@@ -76,6 +80,17 @@ impl Match {
     // TODO: Make the return type `&[Tile]` once cs-bindgen supports returning slices.
     pub fn get_player_hand(&self, seat: Wind) -> Vec<Tile> {
         self.players.get(&seat).unwrap().hand.clone()
+    }
+
+    // TODO: Combine `player_has_current_draw` and `get_current_draw` into a single
+    // function tha returns an `Option<Tile>` once cs-bindgen supports `Option`.
+
+    pub fn player_has_current_draw(&self, seat: Wind) -> bool {
+        self.players.get(&seat).unwrap().current_draw.is_some()
+    }
+
+    pub fn get_current_draw(&self, seat: Wind) -> Tile {
+        self.players.get(&seat).unwrap().current_draw.unwrap()
     }
 }
 
