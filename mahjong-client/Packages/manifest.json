@@ -1,13 +1,6 @@
 {
   "scopedRegistries": [
     {
-      "name": "Packages from jillejr",
-      "url": "https://npm.cloudsmith.io/jillejr/newtonsoft-json-for-unity/",
-      "scopes": [
-        "jillejr"
-      ]
-    },
-    {
       "name": "package.openupm.com",
       "url": "https://package.openupm.com",
       "scopes": [

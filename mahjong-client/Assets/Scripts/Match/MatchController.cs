@@ -14,18 +14,6 @@ namespace Synapse.Mahjong.Match
     /// </summary>
     public class MatchController : MonoBehaviour
     {
-        #region Constants
-
-        // TODO: Figure out a better way to track tile dimensions. This should likely be
-        // tracked along with the tile asset set, once we move the tile set to a custom
-        // asset.
-        private const float TileWidth = 0.026f;
-
-        private const float LeftSide = TileWidth * TilesInAHand * -0.5f;
-        private const int TilesInAHand = 13;
-
-        #endregion
-
         #region Configuration Fields
 
         [SerializeField]
@@ -86,28 +74,22 @@ namespace Synapse.Mahjong.Match
                 var hand = _hands[(int)seat];
                 var tiles = _state.GetPlayerHand(seat);
 
-                foreach (var (index, tile) in tiles.Enumerate())
+                foreach (var tile in tiles)
                 {
                     // Instantiate the prefab for the tile.
                     var prefab = GetTilePrefab(tile.Tile);
                     var tileObject = Instantiate(prefab);
 
-                    // Make the tile a child of the root object for the player's hand,
-                    // and position it horizontally.
-                    tileObject.transform.SetParent(hand.HandRoot, false);
-                    tileObject.transform.localPosition = new Vector3(
-                        LeftSide + TileWidth * index,
-                        0f,
-                        0f);
+                    hand.AddToHand(tile, tileObject);
                 }
 
                 if (_state.PlayerHasCurrentDraw(seat))
                 {
                     var currentDraw = _state.GetCurrentDraw(seat);
                     var prefab = GetTilePrefab(currentDraw.Tile);
-
                     var tileObject = Instantiate(prefab);
-                    tileObject.transform.SetParent(hand.DrawTileAnchor, false);
+
+                    hand.DrawTile(currentDraw, tileObject);
                 }
             }
         }
