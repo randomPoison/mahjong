@@ -9,7 +9,7 @@ REM Build and install the cs-bindgen CLI so that we can run it now.
 
 CD ../cs-bindgen
 
-cargo install --path cs-bindgen-cli --debug --force
+cargo install --path cs-bindgen-cli --debug
 
 CD ../mahjong
 
