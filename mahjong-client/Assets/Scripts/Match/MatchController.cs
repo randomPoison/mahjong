@@ -62,6 +62,13 @@ namespace Synapse.Mahjong.Match
                 RequestStartMatch(),
                 LoadTilePrefabs());
 
+            // Register input events from the player's hand.
+            //
+            // TODO: Have the server data specify which player is controlled by this
+            // client, rather than hard coding it to always control the east seat.
+            var playerHand = _hands[(int)Wind.East];
+            playerHand.TileClicked += OnTileClicked;
+
             // Once we have the match data, instantiate the tiles for each player's
             // starting hand.
             //
@@ -76,20 +83,13 @@ namespace Synapse.Mahjong.Match
 
                 foreach (var tile in tiles)
                 {
-                    // Instantiate the prefab for the tile.
-                    var prefab = GetTilePrefab(tile.Tile);
-                    var tileObject = Instantiate(prefab);
-
-                    hand.AddToHand(tile, tileObject);
+                    hand.AddToHand(InstantiateTile(tile));
                 }
 
                 if (_state.PlayerHasCurrentDraw(seat))
                 {
                     var currentDraw = _state.GetCurrentDraw(seat);
-                    var prefab = GetTilePrefab(currentDraw.Tile);
-                    var tileObject = Instantiate(prefab);
-
-                    hand.DrawTile(currentDraw, tileObject);
+                    hand.DrawTile(InstantiateTile(currentDraw));
                 }
             }
         }
@@ -124,6 +124,14 @@ namespace Synapse.Mahjong.Match
             _state = _client.HandleStartMatchResponse(responseJson);
             Debug.Log($"Started match, ID: {_state.Id()}", this);
         }
+
+        private void OnTileClicked(TileId id)
+        {
+            // TODO: Request from the server that the selected tile be discarded.
+            throw new NotImplementedException();
+        }
+
+        #region Tile Asset Handling
 
         /// <summary>
         /// Loads the prefabs for all of the tiles and populates the prefab lists.
@@ -230,34 +238,48 @@ namespace Synapse.Mahjong.Match
             }
         }
 
-        private GameObject GetTilePrefab(ITile tile)
+        private TileView InstantiateTile(TileInstance instance)
         {
-            switch (tile)
+            var prefab = GetPrefab(instance.Tile);
+            var view = Instantiate(prefab).GetComponent<TileView>();
+            view.Populate(instance);
+            return view;
+
+            // Helper method to ensure that the switch statement handles all possible
+            // control flow paths. If we don't wrap it in a function, the compiler
+            // wouldn't warn us if we failed to handle all control flow paths. This
+            // could be replaced with a switch expression if we ever get C# 8.0 support.
+            GameObject GetPrefab(ITile tile)
             {
-                case Tile.Simple simple:
-                    // Tile numbers start at 1, so we need to subtract 1 to get the
-                    // index corresponding to the tile's numeric value.
-                    int tileIndex = simple.Element0.Number - 1;
+                switch (tile)
+                {
+                    case Tile.Simple simple:
+                        // Tile numbers start at 1, so we need to subtract 1 to get the
+                        // index corresponding to the tile's numeric value.
+                        int tileIndex = simple.Element0.Number - 1;
 
-                    switch (simple.Element0.Suit)
-                    {
-                        case Suit.Bamboo: return _bambooPrefabs[tileIndex];
-                        case Suit.Characters: return _characterPrefabs[tileIndex];
-                        case Suit.Coins: return _circlePrefabs[tileIndex];
+                        switch (simple.Element0.Suit)
+                        {
+                            case Suit.Bamboo: return _bambooPrefabs[tileIndex];
+                            case Suit.Characters: return _characterPrefabs[tileIndex];
+                            case Suit.Coins: return _circlePrefabs[tileIndex];
 
-                        default:
-                            throw new ArgumentException(
-                       $"Invalid suit {simple.Element0.Suit}");
-                    }
+                            default:
+                                throw new ArgumentException(
+                           $"Invalid suit {simple.Element0.Suit}");
+                        }
 
-                case Tile.Dragon dragon:
-                    return _dragonPrefabs[(int)dragon.Element0];
+                    case Tile.Dragon dragon:
+                        return _dragonPrefabs[(int)dragon.Element0];
 
-                case Tile.Wind wind:
-                    return _windPrefabs[(int)wind.Element0];
+                    case Tile.Wind wind:
+                        return _windPrefabs[(int)wind.Element0];
 
-                default: throw new ArgumentException($"Invalid tile kind {tile}");
+                    default: throw new ArgumentException($"Invalid tile kind {tile}");
+                }
             }
         }
+
+        #endregion
     }
 }
