@@ -15,11 +15,11 @@ pub struct MatchState {
     pub players: HashMap<Wind, Player>,
 
     /// The live wall that players will draw from.
-    pub wall: Vec<Tile>,
+    pub wall: Vec<TileInstance>,
 }
 
 impl MatchState {
-    pub fn new(id: MatchId, tiles: Vec<Tile>) -> Self {
+    pub fn new(id: MatchId, tiles: Vec<TileInstance>) -> Self {
         Self {
             id,
             players: hashmap! {
@@ -78,7 +78,7 @@ impl MatchState {
     }
 
     // TODO: Make the return type `&[Tile]` once cs-bindgen supports returning slices.
-    pub fn get_player_hand(&self, seat: Wind) -> Vec<Tile> {
+    pub fn get_player_hand(&self, seat: Wind) -> Vec<TileInstance> {
         self.players.get(&seat).unwrap().hand.clone()
     }
 
@@ -89,7 +89,7 @@ impl MatchState {
         self.players.get(&seat).unwrap().current_draw.is_some()
     }
 
-    pub fn get_current_draw(&self, seat: Wind) -> Tile {
+    pub fn get_current_draw(&self, seat: Wind) -> TileInstance {
         self.players.get(&seat).unwrap().current_draw.unwrap()
     }
 }
@@ -135,13 +135,13 @@ pub struct Player {
     pub controller: Option<SessionId>,
 
     /// The player's current hand.
-    pub hand: Vec<Tile>,
+    pub hand: Vec<TileInstance>,
 
     /// The player's current draw, if any.
-    pub current_draw: Option<Tile>,
+    pub current_draw: Option<TileInstance>,
 
     /// The player's discard pile.
-    pub discards: Vec<Tile>,
+    pub discards: Vec<TileInstance>,
 }
 
 impl Player {

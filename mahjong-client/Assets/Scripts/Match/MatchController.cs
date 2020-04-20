@@ -76,6 +76,11 @@ namespace Synapse.Mahjong.Match
 
             // Once we have the match data, instantiate the tiles for each player's
             // starting hand.
+            //
+            // TODO: Move tile placement logic into `PlayerHand`. The match controller
+            // should only need to add and remove tiles from the hands as the match's
+            // state advances, and the `PlayerHand` script should handle layout and
+            // positioning.
             foreach (var seat in EnumUtils.GetValues<Wind>())
             {
                 var hand = _hands[(int)seat];
@@ -84,7 +89,7 @@ namespace Synapse.Mahjong.Match
                 foreach (var (index, tile) in tiles.Enumerate())
                 {
                     // Instantiate the prefab for the tile.
-                    var prefab = GetTilePrefab(tile);
+                    var prefab = GetTilePrefab(tile.Tile);
                     var tileObject = Instantiate(prefab);
 
                     // Make the tile a child of the root object for the player's hand,
@@ -99,7 +104,7 @@ namespace Synapse.Mahjong.Match
                 if (_state.PlayerHasCurrentDraw(seat))
                 {
                     var currentDraw = _state.GetCurrentDraw(seat);
-                    var prefab = GetTilePrefab(currentDraw);
+                    var prefab = GetTilePrefab(currentDraw.Tile);
 
                     var tileObject = Instantiate(prefab);
                     tileObject.transform.SetParent(hand.DrawTileAnchor, false);
