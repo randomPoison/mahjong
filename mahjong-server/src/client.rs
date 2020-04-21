@@ -1,11 +1,10 @@
 use crate::{game::*, GameState};
-use derive_more::From;
+use anyhow::*;
 use futures::{
     prelude::*,
     stream::{SplitSink, SplitStream},
 };
 use mahjong::messages::*;
-use snafu::*;
 use thespian::*;
 use warp::{filters::ws::Message as WsMessage, ws::WebSocket};
 
@@ -24,7 +23,7 @@ impl ClientController {
     pub async fn perform_handshake(
         socket: WebSocket,
         mut game: <GameState as Actor>::Proxy,
-    ) -> Result<(<ClientController as Actor>::Proxy, SplitStream<WebSocket>), HandshakeError> {
+    ) -> Result<(<ClientController as Actor>::Proxy, SplitStream<WebSocket>)> {
         let (mut sink, mut stream) = socket.split();
 
         // HACK: Send an initial text message to the client after establishing a
@@ -43,12 +42,12 @@ impl ClientController {
         let request = stream
             .next()
             .await
-            .ok_or(HandshakeError::ClientDisconnected)??;
+            .ok_or(anyhow!("Client disconnected"))??;
 
         // Parse the request data.
         let request = request
             .to_str()
-            .map_err(|_| HandshakeError::InvalidRequest)?;
+            .map_err(|_| anyhow!("Incoming socket message is not a string: {:?}", request))?;
         let request: HandshakeRequest = serde_json::from_str(request)?;
 
         // Verify that the client is compatible with the current server version. For now
@@ -98,10 +97,10 @@ impl ClientController {
 
 #[thespian::actor]
 impl ClientController {
-    pub async fn handle_message(&mut self, message: WsMessage) -> Result<(), MessageError> {
+    pub async fn handle_message(&mut self, message: WsMessage) -> Result<()> {
         let text = match message.to_str() {
             Ok(text) => text,
-            Err(_) => return Err(MessageError::NonText { message }),
+            Err(_) => bail!("Received non-text message: {:?}", message),
         };
 
         let request = serde_json::from_str::<ClientRequest>(text)?;
@@ -123,9 +122,26 @@ impl ClientController {
                     .expect("Failed to get initial state from match controller");
                 let response = serde_json::to_string(&StartMatchResponse { state })
                     .expect("Failed to serialize `StartMatchResponse`");
-                self.send_text(response).await;
+                self.send_text(response).await?;
 
                 self.state = ClientState::InMatch { controller };
+            }
+
+            ClientRequest::DiscardTile(request) => {
+                let controller = match &mut self.state {
+                    ClientState::InMatch { controller } => controller,
+                    _ => bail!("Cannot discard a tile when not in a match"),
+                };
+
+                let match_state = controller
+                    .discard_tile(request.player, request.tile)
+                    .await??;
+
+                let response = serde_json::to_string(&DiscardTileResponse {
+                    success: true,
+                    state: match_state,
+                })?;
+                self.send_text(response).await?;
             }
         }
 
@@ -133,11 +149,11 @@ impl ClientController {
     }
 
     /// Sends the provided string as a message to the client.
-    async fn send_text(&mut self, text: String) {
+    async fn send_text(&mut self, text: String) -> Result<()> {
         self.sink
             .send(WsMessage::text(text))
             .await
-            .expect("Failed to send message to client");
+            .context("Failed to send message to client")
     }
 }
 
@@ -145,25 +161,4 @@ impl ClientController {
 enum ClientState {
     Idle,
     InMatch { controller: MatchControllerProxy },
-}
-
-#[derive(Debug, From)]
-pub enum HandshakeError {
-    ClientDisconnected,
-    InvalidRequest,
-    Socket(warp::Error),
-    Json(serde_json::Error),
-    Actor(thespian::MessageError),
-}
-
-#[derive(Debug, Snafu)]
-pub enum MessageError {
-    NonText {
-        message: WsMessage,
-    },
-
-    #[snafu(context(false))]
-    BadJson {
-        source: serde_json::Error,
-    },
 }

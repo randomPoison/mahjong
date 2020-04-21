@@ -4,7 +4,7 @@ use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
 use std::collections::HashMap;
 use thespian::*;
-use tile::Wind;
+use tile::{TileId, Wind};
 
 #[derive(Debug, Actor)]
 pub struct MatchController {
@@ -45,5 +45,18 @@ impl MatchController {
 impl MatchController {
     pub fn state(&self) -> MatchState {
         self.state.clone()
+    }
+
+    /// Returns the updated match state if the requested discard is valid.
+    pub fn discard_tile(
+        &mut self,
+        player: Wind,
+        tile: TileId,
+    ) -> Result<MatchState, InvalidDiscard> {
+        // TODO: Verify that the client submitting the action is actually the one that
+        // controls the player.
+
+        self.state.discard_tile(player, tile)?;
+        Ok(self.state.clone())
     }
 }

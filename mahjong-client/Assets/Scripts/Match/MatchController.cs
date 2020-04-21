@@ -48,6 +48,10 @@ namespace Synapse.Mahjong.Match
         private GameObject[] _dragonPrefabs = new GameObject[3];
         private GameObject[] _windPrefabs = new GameObject[4];
 
+        // Root cancellation source for any tasks spawned by the controller, used to
+        // cancel all pending tasks if we abruptly exit the match screen.
+        private CancellationTokenSource _cancellation = new CancellationTokenSource();
+
         #endregion
 
         public async void Init(ClientState client, WebSocket socket)
@@ -59,8 +63,8 @@ namespace Synapse.Mahjong.Match
             // the background. Wait for both of these operations to complete before
             // attempting to instantiate any tiles.
             await UniTask.WhenAll(
-                RequestStartMatch(),
-                LoadTilePrefabs());
+                RequestStartMatch(_cancellation.Token),
+                LoadTilePrefabs(_cancellation.Token));
 
             // Register input events from the player's hand.
             //
@@ -79,7 +83,8 @@ namespace Synapse.Mahjong.Match
             foreach (var seat in EnumUtils.GetValues<Wind>())
             {
                 var hand = _hands[(int)seat];
-                var tiles = _state.GetPlayerHand(seat);
+
+                var tiles = _state.PlayerHand(seat);
 
                 foreach (var tile in tiles)
                 {
@@ -88,9 +93,39 @@ namespace Synapse.Mahjong.Match
 
                 if (_state.PlayerHasCurrentDraw(seat))
                 {
-                    var currentDraw = _state.GetCurrentDraw(seat);
+                    var currentDraw = _state.CurrentDraw(seat);
                     hand.DrawTile(InstantiateTile(currentDraw));
                 }
+            }
+
+            // Helper method to handle 
+            async UniTask RequestStartMatch(CancellationToken cancellation = default)
+            {
+                // Request that the server start a match.
+                var request = _client.CreateStartMatchRequest();
+                _socket.SendString(request);
+                var responseJson = await _socket.RecvStringAsync(cancellation);
+                Debug.Log(responseJson, this);
+
+                // TODO: Add some kind of error handling around failure. Probably not doable
+                // until we can return more structured data from Rust functions.
+                _state = _client.HandleStartMatchResponse(responseJson);
+                Debug.Log($"Started match, ID: {_state.Id()}", this);
+            }
+        }
+
+        #region Unity Lifecycle Methods
+
+        private void Awake()
+        {
+            // Validate that the `PlayerHand` object for each seat is correctly configured.
+            foreach (var seat in EnumUtils.GetValues<Wind>())
+            {
+                var hand = _hands[(int)seat];
+                Debug.Assert(
+                    seat == hand.Seat,
+                    $"{nameof(PlayerHand)} setup is incorrect, hand at seat {seat}" +
+                    $"configured for seat {hand.Seat}");
             }
         }
 
@@ -99,36 +134,54 @@ namespace Synapse.Mahjong.Match
             _state?.Dispose();
             _state = null;
 
+            // Cancel any pending tasks.
+            _cancellation.Cancel();
+            _cancellation.Dispose();
+            _cancellation = null;
+
             // TODO: Unload any tile assets that we loaded? This *might* require some
             // logic to only attempt to unload assets that were successfully loaded in
             // the case where not all tile assets loaded before we leave the match.
         }
 
-        /// <summary>
-        /// Requests that the server start a new match.
-        /// </summary>
-        ///
-        /// <returns>
-        /// A task that resolves once the match has been successfully created.
-        /// </returns>
-        private async UniTask RequestStartMatch(CancellationToken cancellation = default)
+        #endregion
+
+        private async void OnTileClicked(PlayerHand hand, TileId id)
         {
-            // Request that the server start a match.
-            var request = _client.CreateStartMatchRequest();
+            // Do nothing if the player clicked on their tile when it wasn't their turn.
+            if (_state.CurrentTurn() != hand.Seat)
+            {
+                return;
+            }
+
+            // Attempt to discard the tile. If the operation fails, ignore the click event.
+            //
+            // TODO: Show some kind of feedback when the discard attempt fails. To
+            // handle this well we would need to be able to get more structured error
+            // data back from the Rust side.
+            if (!_state.TryDiscardTile(hand.Seat, id))
+            {
+                return;
+            }
+
+            // Send the tile to the graveyard!
+            hand.MoveToDiscard(id);
+
+            // If the local attempt to discard the tile succeeded, send a request to the
+            // server to perform the action.
+            var request = _state.RequestDiscardTile(hand.Seat, id);
             _socket.SendString(request);
-            var responseJson = await _socket.RecvStringAsync(cancellation);
-            Debug.Log(responseJson, this);
+            var responseString = await _socket.RecvStringAsync(_cancellation.Token);
 
-            // TODO: Add some kind of error handling around failure. Probably not doable
-            // until we can return more structured data from Rust functions.
-            _state = _client.HandleStartMatchResponse(responseJson);
-            Debug.Log($"Started match, ID: {_state.Id()}", this);
-        }
-
-        private void OnTileClicked(TileId id)
-        {
-            // TODO: Request from the server that the selected tile be discarded.
-            throw new NotImplementedException();
+            // TODO: If the server rejected the discard action, roll back the client
+            // state to reflect the correct server state. We'll also need to give the
+            // player some kind of feedback about what went wrong, which will require
+            // more structured error information from the Rust code.
+            if (!_state.HandleDiscardTileResponse(responseString))
+            {
+                throw new NotImplementedException(
+                    $"Server rejected attempt to discard tile {id} from {hand.Seat} player's hand");
+            }
         }
 
         #region Tile Asset Handling

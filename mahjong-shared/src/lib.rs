@@ -83,8 +83,8 @@ impl ClientState {
         response.state
     }
 
-    pub fn account_id(&self) -> u64 {
-        self.credentials.as_ref().unwrap().id.raw()
+    pub fn account_id(&self) -> AccountId {
+        self.credentials.as_ref().unwrap().id
     }
 
     pub fn points(&self) -> u64 {

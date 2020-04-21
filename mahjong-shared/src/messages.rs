@@ -1,4 +1,12 @@
-use crate::game::MatchState;
+//! The message definitions for communication between the client and server.
+
+// TODO: We will likely replace these explicit message definitions with an RPC
+// framework once we move the communication layer into Rust.
+
+use crate::{
+    game::{MatchId, MatchState},
+    tile::{TileId, Wind},
+};
 use cs_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -42,11 +50,6 @@ impl AccountId {
     pub fn new(id: u64) -> Self {
         Self(id)
     }
-
-    // TODO: Remove this once we can directly pass `AccountId` values to and from C#.
-    pub fn raw(self) -> u64 {
-        self.0
-    }
 }
 
 /// Unique ID for a client session.
@@ -79,9 +82,27 @@ pub struct Credentials {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ClientRequest {
     StartMatch,
+    DiscardTile(DiscardTileRequest),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartMatchResponse {
+    pub state: MatchState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiscardTileRequest {
+    pub id: MatchId,
+    pub player: Wind,
+    pub tile: TileId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DiscardTileResponse {
+    pub success: bool,
+
+    /// The updated state of the match after the discard was applied.
+    // TODO: Send a more minimal diff of the state after applying the change, rather
+    // than sending the full state data for the match.
     pub state: MatchState,
 }
