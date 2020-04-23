@@ -25,13 +25,12 @@ pub struct ClientController {
 impl ClientController {
     /// Attempts to perform the session handshake with the client, returning a new
     /// `ClientConnection` if it succeeds.
-    #[tracing::instrument(skip(id, socket, game))]
     pub async fn perform_handshake(
         id: ClientId,
         socket: WebSocket,
         mut game: <GameState as Actor>::Proxy,
     ) -> Result<(<ClientController as Actor>::Proxy, SplitStream<WebSocket>)> {
-        let span = info_span!("ClientController::perform_handshake", %id);
+        let span = info_span!("perform_handshake", %id);
         let _span = span.enter();
 
         info!("Starting client handshake");
@@ -125,7 +124,7 @@ impl ClientController {
 #[thespian::actor]
 impl ClientController {
     pub async fn handle_message(&mut self, message: WsMessage) -> Result<()> {
-        let span = trace_span!("ClientController::handle_message", id = %self.id);
+        let span = trace_span!("handle_message", id = %self.id);
         let _span = span.enter();
 
         let text = match message.to_str() {
@@ -134,7 +133,7 @@ impl ClientController {
         };
 
         let request = serde_json::from_str::<ClientRequest>(text)?;
-        trace!(?request, "Handling incoming request");
+        info!(?request, "Handling incoming request");
 
         match request {
             ClientRequest::StartMatch => {

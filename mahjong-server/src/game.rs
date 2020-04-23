@@ -5,6 +5,7 @@ use rand_pcg::*;
 use std::collections::HashMap;
 use thespian::*;
 use tile::{TileId, Wind};
+use tracing::*;
 
 #[derive(Debug, Actor)]
 pub struct MatchController {
@@ -62,6 +63,9 @@ impl MatchController {
         // controls the player.
 
         self.state.discard_tile(player, tile)?;
+
+        trace!("Successfully discarded tile");
+
         Ok(self.state.clone())
     }
 }
