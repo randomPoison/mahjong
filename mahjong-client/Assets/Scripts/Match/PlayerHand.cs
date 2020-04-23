@@ -17,6 +17,7 @@ namespace Synapse.Mahjong.Match
         // tracked along with the tile asset set, once we move the tile set to a custom
         // asset.
         private const float TileWidth = 0.026f;
+        private const float TileLength = 0.034f;
 
         #endregion
 
@@ -33,6 +34,7 @@ namespace Synapse.Mahjong.Match
 
         private List<TileView> _tiles = new List<TileView>();
         private TileView _currentDraw = null;
+        private List<TileView> _discards = new List<TileView>();
 
         #endregion
 
@@ -92,11 +94,11 @@ namespace Synapse.Mahjong.Match
 
             // Get the `TileView` object for the selected tile, either from the tiles
             // in the player's hand or from the current draw.
-            var index = _tiles.FindIndex(tile => tile.Model.Id.Element0 == id.Element0);
-            if (index >= 0)
+            var discardIndex = _tiles.FindIndex(tile => tile.Model.Id.Element0 == id.Element0);
+            if (discardIndex >= 0)
             {
-                discarded = _tiles[index];
-                _tiles.RemoveAt(index);
+                discarded = _tiles[discardIndex];
+                _tiles.RemoveAt(discardIndex);
             }
             else if (_currentDraw != null && _currentDraw.Model.Id.Element0 == id.Element0)
             {
@@ -108,12 +110,30 @@ namespace Synapse.Mahjong.Match
                 throw new ArgumentException($"Tile {id} is not in {Seat} player's hand");
             }
 
+            // Add the discarded tile to the list of discards.
+            _discards.Add(discarded);
+
             // Make the discarded tile a child of the root object for the discard pile,
             // but keep its world position so that we can animate it from its current
             // position to its target position int the discard pile.
-            //
-            // TODO: Actually do that tween.
             discarded.transform.SetParent(_discardRoot, worldPositionStays: true);
+
+            // TODO: Actually do a tween. For now we'll immediately display the tile in
+            // the player's discards.
+
+            // Layout the discarded tiles in rows of 6 tiles.
+            var leftSide = TileWidth * -6 * 0.5f;
+            foreach (var (index, tile) in _discards.Enumerate())
+            {
+                int row = index / 6;
+                int col = index % 6;
+                tile.transform.localPosition = new Vector3(
+                    leftSide + col * TileWidth,
+                    0f,
+                    -row * TileLength);
+
+                tile.transform.localRotation = Quaternion.identity;
+            }
 
             // Remove the click handler so that we don't get click events from discarded
             // tiles.
