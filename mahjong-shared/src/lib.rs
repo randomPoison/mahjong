@@ -1,5 +1,6 @@
 use crate::{game::*, messages::*};
 use cs_bindgen::prelude::*;
+use tracing::*;
 
 // Re-export any crates that we also want to use on the server side. This has the
 // dual benefits of making it so that we don't need to declare the dependency twice,
@@ -48,11 +49,10 @@ impl ClientState {
     /// accepted the handshake request, returns `false` if the server rejected the
     /// request or an error otherwise occurred during the process.
     pub fn handle_handshake_response(&mut self, json: String) -> bool {
-        dbg!(&json);
         match serde_json::from_str::<HandshakeResponse>(&json) {
             Ok(message) => {
                 if let Some(new_credentials) = message.new_credentials {
-                    println!(
+                    info!(
                         "Overwriting existing credentials, new: {:?}, prev: {:?}",
                         new_credentials, self.credentials,
                     );
@@ -64,10 +64,7 @@ impl ClientState {
                 true
             }
 
-            Err(err) => {
-                dbg!(err);
-                false
-            }
+            Err(_) => false,
         }
     }
 

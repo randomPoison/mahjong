@@ -43,11 +43,16 @@ impl MatchController {
 
 #[thespian::actor]
 impl MatchController {
+    pub fn id(&self) -> MatchId {
+        self.state.id
+    }
+
     pub fn state(&self) -> MatchState {
         self.state.clone()
     }
 
     /// Returns the updated match state if the requested discard is valid.
+    #[tracing::instrument(skip(self))]
     pub fn discard_tile(
         &mut self,
         player: Wind,

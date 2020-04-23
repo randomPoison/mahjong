@@ -8,6 +8,7 @@ use crate::{
     tile::{TileId, Wind},
 };
 use cs_bindgen::prelude::*;
+use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
 pub use semver::Version;
@@ -38,8 +39,11 @@ pub struct HandshakeResponse {
 
 /// Unique ID for a game account.
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[repr(transparent)]
+#[display("{}", _0)]
 pub struct AccountId(u64);
 
 impl AccountId {

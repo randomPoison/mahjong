@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 anyhow = "1.0.28"
 async-std = { version = "1.4.0", features = ["attributes"] }
+derive_more = "0.99.5"
 futures = "0.3.1"
 mahjong = { path = "../mahjong-shared" }
 rand = "0.7.3"
@@ -16,4 +17,7 @@ rand_pcg = "0.2.1"
 serde_json = "1.0.45"
 thespian = { git = "https://github.com/randomPoison/thespian", rev = "05f8d9d" }
 tokio = { version = "0.2.10", features = ["full"] }
+tracing = "0.1.13"
+tracing-futures = "0.2.4"
+tracing-subscriber = "0.2.4"
 warp = "0.2.1"
