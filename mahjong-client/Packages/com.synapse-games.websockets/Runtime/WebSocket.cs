@@ -204,7 +204,7 @@ public class WebSocket
         else
         {
             var completion = new TaskCompletionSource<byte[]>();
-            cancellation.Register(() => completion.SetCanceled());
+            cancellation.Register(() => completion.TrySetCanceled());
             _pendingTasks.Enqueue(completion);
             return completion.Task;
         }
