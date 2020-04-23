@@ -104,6 +104,9 @@ impl MatchState {
             })
             .ok_or(InvalidDiscard::TileNotInHand)?;
         player.discards.push(tile);
+
+        // Update to the next player's turn, cycling through the seats in wind order.
+        self.current_turn = self.current_turn.next();
     }
 }
 

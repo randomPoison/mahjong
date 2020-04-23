@@ -59,12 +59,90 @@ pub enum Wind {
     North,
 }
 
+impl Wind {
+    /// Returns the next wind in the cycle order for winds.
+    ///
+    /// Winds follow the order:
+    ///
+    /// ```text
+    /// East -> South -> West -> North -> East
+    /// ```
+    ///
+    /// Where North cycles back around to East. This is used for determining the dora
+    /// from the dora indicator, and for determining turn order based on seat winds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mahjong::tile::Wind;
+    ///
+    /// let mut wind = Wind::East;
+    ///
+    /// wind = wind.next();
+    /// assert_eq!(Wind::South, wind);
+    ///
+    /// wind = wind.next();
+    /// assert_eq!(Wind::West, wind);
+    ///
+    /// wind = wind.next();
+    /// assert_eq!(Wind::North, wind);
+    ///
+    /// wind = wind.next();
+    /// assert_eq!(Wind::East, wind);
+    /// ```
+    pub fn next(self) -> Self {
+        match self {
+            Wind::East => Wind::South,
+            Wind::South => Wind::West,
+            Wind::West => Wind::North,
+            Wind::North => Wind::East,
+        }
+    }
+}
+
 #[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
 pub enum Dragon {
-    Red,
-    Green,
     White,
+    Green,
+    Red,
+}
+
+impl Dragon {
+    /// Returns the next dragon in the cycle order for dragons.
+    ///
+    /// Dragons follow the order:
+    ///
+    /// ```text
+    /// White -> Green -> Red -> White
+    /// ```
+    ///
+    /// Where Red cycles back around to Red. This is used to determine the dora based
+    /// on the dora indicator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use mahjong::tile::Dragon;
+    ///
+    /// let mut dragon = Dragon::White;
+    ///
+    /// dragon = dragon.next();
+    /// assert_eq!(Dragon::Green, dragon);
+    ///
+    /// dragon = dragon.next();
+    /// assert_eq!(Dragon::Red, dragon);
+    ///
+    /// dragon = dragon.next();
+    /// assert_eq!(Dragon::White, dragon);
+    /// ```
+    pub fn next(self) -> Self {
+        match self {
+            Dragon::White => Dragon::Green,
+            Dragon::Green => Dragon::Red,
+            Dragon::Red => Dragon::White,
+        }
+    }
 }
 
 /// Unique identifier for a tile within a match.
