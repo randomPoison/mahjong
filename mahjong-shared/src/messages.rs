@@ -101,12 +101,9 @@ pub struct DiscardTileRequest {
     pub tile: TileId,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DiscardTileResponse {
-    pub success: bool,
-
-    /// The updated state of the match after the discard was applied.
-    // TODO: Send a more minimal diff of the state after applying the change, rather
-    // than sending the full state data for the match.
-    pub state: MatchState,
+#[cs_bindgen]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MatchEvent {
+    TileDrawn { seat: Wind, tile: TileId },
+    TileDiscarded { seat: Wind, tile: TileId },
 }

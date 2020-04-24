@@ -38,7 +38,8 @@ namespace Synapse.Mahjong.Match
 
         private WebSocket _socket;
         private ClientState _client;
-        private MatchState _state;
+        private MatchState _serverState;
+        private MatchState _localState;
 
         // Cached prefabs for the different tiles. These are populated during startup
         // based on the asset references configured above.
@@ -84,21 +85,38 @@ namespace Synapse.Mahjong.Match
             {
                 var hand = _hands[(int)seat];
 
-                var tiles = _state.PlayerHand(seat);
+                var tiles = _localState.PlayerHand(seat);
 
                 foreach (var tile in tiles)
                 {
                     hand.AddToHand(InstantiateTile(tile));
                 }
 
-                if (_state.PlayerHasCurrentDraw(seat))
+                if (_localState.PlayerHasCurrentDraw(seat))
                 {
-                    var currentDraw = _state.CurrentDraw(seat);
+                    var currentDraw = _localState.CurrentDraw(seat);
                     hand.DrawTile(InstantiateTile(currentDraw));
                 }
             }
 
-            // Helper method to handle 
+            // Process incoming updates from the server.
+            while (true)
+            {
+                var eventJson = await _socket.RecvStringAsync(_cancellation.Token);
+                IMatchEvent update = MatchState.DeserializeEvent(eventJson);
+                switch (update)
+                {
+                    case MatchEvent.TileDrawn drawEvent:
+
+                        break;
+
+                    case MatchEvent.TileDiscarded discardEvent:
+
+                        break;
+                }
+            }
+
+            // Helper method to handle requesting match creation from the server.
             async UniTask RequestStartMatch(CancellationToken cancellation = default)
             {
                 // Request that the server start a match.
@@ -109,8 +127,15 @@ namespace Synapse.Mahjong.Match
 
                 // TODO: Add some kind of error handling around failure. Probably not doable
                 // until we can return more structured data from Rust functions.
-                _state = _client.HandleStartMatchResponse(responseJson);
-                Debug.Log($"Started match, ID: {_state.Id()}", this);
+                _serverState = _client.HandleStartMatchResponse(responseJson);
+
+                // TODO: Clone the server state directly to get the initial local state.
+                // This will require cs-bindgen to generate `Clone()` methods. For now
+                // we'll have to re-deserialize the server response to get a fresh copy
+                // of the match state.
+                _localState = _client.HandleStartMatchResponse(responseJson);
+
+                Debug.Log($"Started match, ID: {_serverState.Id()}", this);
             }
         }
 
@@ -131,8 +156,11 @@ namespace Synapse.Mahjong.Match
 
         private void OnDestroy()
         {
-            _state?.Dispose();
-            _state = null;
+            _serverState?.Dispose();
+            _serverState = null;
+
+            _localState?.Dispose();
+            _localState = null;
 
             // Cancel any pending tasks.
             _cancellation.Cancel();
@@ -146,10 +174,10 @@ namespace Synapse.Mahjong.Match
 
         #endregion
 
-        private async void OnTileClicked(PlayerHand hand, TileId id)
+        private void OnTileClicked(PlayerHand hand, TileId id)
         {
             // Do nothing if the player clicked on their tile when it wasn't their turn.
-            if (_state.CurrentTurn() != hand.Seat)
+            if (_localState.CurrentTurn() != hand.Seat)
             {
                 return;
             }
@@ -159,7 +187,7 @@ namespace Synapse.Mahjong.Match
             // TODO: Show some kind of feedback when the discard attempt fails. To
             // handle this well we would need to be able to get more structured error
             // data back from the Rust side.
-            if (!_state.TryDiscardTile(hand.Seat, id))
+            if (!_localState.TryDiscardTile(hand.Seat, id))
             {
                 return;
             }
@@ -169,19 +197,8 @@ namespace Synapse.Mahjong.Match
 
             // If the local attempt to discard the tile succeeded, send a request to the
             // server to perform the action.
-            var request = _state.RequestDiscardTile(hand.Seat, id);
+            var request = _serverState.RequestDiscardTile(hand.Seat, id);
             _socket.SendString(request);
-            var responseString = await _socket.RecvStringAsync(_cancellation.Token);
-
-            // TODO: If the server rejected the discard action, roll back the client
-            // state to reflect the correct server state. We'll also need to give the
-            // player some kind of feedback about what went wrong, which will require
-            // more structured error information from the Rust code.
-            if (!_state.HandleDiscardTileResponse(responseString))
-            {
-                throw new NotImplementedException(
-                    $"Server rejected attempt to discard tile {id} from {hand.Seat} player's hand");
-            }
         }
 
         #region Tile Asset Handling

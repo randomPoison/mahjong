@@ -20,5 +20,5 @@ REM equivalent?
 cargo build -p mahjong --target wasm32-unknown-unknown
 cs-bindgen-cli -o mahjong-client/Packages/com.synapse-games.mahjong/Mahjong.cs target/wasm32-unknown-unknown/debug/mahjong.wasm
 
-cargo build
+cargo build -p mahjong
 xcopy /y "target\debug\mahjong.dll" "mahjong-client\Packages\com.synapse-games.mahjong"

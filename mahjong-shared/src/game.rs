@@ -68,15 +68,16 @@ impl MatchState {
 
     /// Draws the next tile from the wall and puts it in a player's draw slot.
     #[throws(InsufficientTiles)]
-    pub fn draw_into_hand(&mut self, seat: Wind) {
+    pub fn draw_into_hand(&mut self, seat: Wind) -> TileId {
         let player = self.players.get_mut(&seat).unwrap();
 
         let tile = self
             .wall
             .pop()
             .ok_or(InsufficientTiles::new(self.wall.len(), 1))?;
-
         player.current_draw = Some(tile);
+
+        tile.id
     }
 
     #[throws(InvalidDiscard)]
@@ -154,20 +155,8 @@ impl MatchState {
         serde_json::to_string(&request).unwrap()
     }
 
-    pub fn handle_discard_tile_response(&mut self, response: String) -> bool {
-        let response = serde_json::from_str::<DiscardTileResponse>(&response).unwrap();
-
-        // Error out if the server rejected the action.
-        if !response.success {
-            return false;
-        }
-
-        // Validate that the returned server state matches the local server state.
-        //
-        // TODO: We'll need more robust tools for reconciling client state with server state
-        // as changes come in. This will be especially important as we setup the server to
-        // send data deltas rather than full data sets.
-        self == &response.state
+    pub fn deserialize_event(json: String) -> MatchEvent {
+        serde_json::from_str(&json).unwrap()
     }
 }
 
@@ -194,11 +183,6 @@ impl MatchId {
 #[cs_bindgen]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Player {
-    /// The client session controlling this player in the match, if any.
-    ///
-    /// If no client controls this player, then the player is CPU-controlled by default.
-    pub controller: Option<SessionId>,
-
     /// The player's current hand.
     // TODO: We probably want this to be a `HashMap<TileId, TileInstance>` instead of
     // `Vec`. We should change that once we can export maps.

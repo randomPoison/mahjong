@@ -170,19 +170,29 @@ impl ClientController {
 
                 trace!("Forwarding discard request to match controller");
 
-                let match_state = controller
+                controller
                     .discard_tile(request.player, request.tile)
-                    .await??;
-
-                let response = serde_json::to_string(&DiscardTileResponse {
-                    success: true,
-                    state: match_state,
-                })?;
-                self.send_text(response).await?;
+                    .await
+                    .expect("Match controller died before match ended")?;
             }
         }
 
         Ok(())
+    }
+
+    /// Sends an event to the client independent of the request/response flow.
+    // TODO: Generalize this to work for all kinds of server-sent events once we have
+    // other events to send.
+    pub async fn send_event(&mut self, event: MatchEvent) {
+        assert!(
+            matches!(self.state, ClientState::InMatch { .. }),
+            "Received match event when client wasn't in a match"
+        );
+
+        let message = serde_json::to_string(&event).expect("Failed to serialize match event");
+        self.send_text(message)
+            .await
+            .expect("Disconnected from the client, probably");
     }
 }
 

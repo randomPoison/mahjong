@@ -1,5 +1,6 @@
 use crate::client::ClientControllerProxy;
-use mahjong::{game::*, strum::IntoEnumIterator, tile};
+use anyhow::Result;
+use mahjong::{game::*, messages::MatchEvent, strum::IntoEnumIterator, tile};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
 use std::collections::HashMap;
@@ -13,7 +14,7 @@ pub struct MatchController {
     state: MatchState,
 
     /// Mapping of which client controls which player seat. Key is the index of the
-    clients: HashMap<usize, ClientControllerProxy>,
+    clients: HashMap<Wind, ClientControllerProxy>,
 }
 
 impl MatchController {
@@ -40,6 +41,17 @@ impl MatchController {
             clients: Default::default(),
         }
     }
+
+    async fn broadcast(&mut self, event: MatchEvent) {
+        trace!(?event, "Broadcasting event to connected clients");
+
+        for client in self.clients.values_mut() {
+            client
+                .send_event(event.clone())
+                .await
+                .expect("Disconnected from client controller");
+        }
+    }
 }
 
 #[thespian::actor]
@@ -54,11 +66,7 @@ impl MatchController {
 
     /// Returns the updated match state if the requested discard is valid.
     #[tracing::instrument(skip(self))]
-    pub fn discard_tile(
-        &mut self,
-        player: Wind,
-        tile: TileId,
-    ) -> Result<MatchState, InvalidDiscard> {
+    pub async fn discard_tile(&mut self, player: Wind, tile: TileId) -> Result<()> {
         // TODO: Verify that the client submitting the action is actually the one that
         // controls the player.
 
@@ -66,6 +74,37 @@ impl MatchController {
 
         trace!("Successfully discarded tile");
 
-        Ok(self.state.clone())
+        // Broadcast the discard event to all connected clients.
+        self.broadcast(MatchEvent::TileDiscarded { seat: player, tile })
+            .await;
+
+        while !self.state.wall.is_empty() {
+            let current_turn = self.state.current_turn;
+
+            // Draw the tile for the next player.
+            let draw = self.state.draw_into_hand(current_turn)?;
+            self.broadcast(MatchEvent::TileDrawn {
+                seat: current_turn,
+                tile: draw,
+            })
+            .await;
+
+            if self.clients.contains_key(&current_turn) {
+                trace!(seat = ?current_turn, "Client at current seat, waiting for player action");
+                break;
+            }
+
+            // Automatically discard the first tile in the player's hand.
+            trace!(seat = ?current_turn, "Performing action for computer-controlled player");
+            let auto_discard = self.state.player(current_turn).hand[0].id;
+            self.state.discard_tile(current_turn, auto_discard)?;
+            self.broadcast(MatchEvent::TileDiscarded {
+                seat: player,
+                tile: auto_discard,
+            })
+            .await;
+        }
+
+        Ok(())
     }
 }
