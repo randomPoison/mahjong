@@ -1,11 +1,11 @@
-use crate::{game::*, GameState};
+use crate::{match_controller::*, GameState};
 use anyhow::*;
 use derive_more::Display;
 use futures::{
     prelude::*,
     stream::{SplitSink, SplitStream},
 };
-use mahjong::messages::*;
+use mahjong::{messages::*, tile::Wind};
 use std::sync::atomic::{AtomicU64, Ordering};
 use thespian::*;
 use tracing::*;
@@ -20,6 +20,8 @@ pub struct ClientController {
     sink: SplitSink<WebSocket, WsMessage>,
     game: <GameState as Actor>::Proxy,
     state: ClientState,
+
+    remote: Remote<Self>,
 }
 
 impl ClientController {
@@ -97,13 +99,14 @@ impl ClientController {
         sink.send(WsMessage::text(response)).await?;
 
         // Create the actor for the client connection and spawn it.
-        let stage = ClientController {
+        let (builder, remote) = StageBuilder::new();
+        let stage = builder.finish(ClientController {
             id,
             sink,
             game,
             state: ClientState::Idle,
-        }
-        .into_stage();
+            remote,
+        });
         let client = stage.proxy();
         tokio::spawn(stage.run());
 
@@ -148,7 +151,14 @@ impl ClientController {
                     .await
                     .expect("Failed to start match");
 
-                trace!("Match started, getting initial state...");
+                // Join the match as the East player.
+                controller
+                    .join(self.remote.proxy(), Wind::East)
+                    .await
+                    .expect("Disconnected from the match controller???")
+                    .expect("Failed to join match, even though we just created it???");
+
+                trace!("Match started, joined as East player");
 
                 let state = controller
                     .state()

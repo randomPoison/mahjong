@@ -1,4 +1,4 @@
-use crate::{client::*, game::*};
+use crate::{client::*, match_controller::*};
 use futures::prelude::*;
 use mahjong::{game::*, messages::*};
 use std::{collections::HashMap, sync::Arc};
@@ -8,7 +8,7 @@ use tracing_futures::Instrument;
 use warp::Filter;
 
 mod client;
-mod game;
+mod match_controller;
 
 #[tokio::main]
 async fn main() {

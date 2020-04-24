@@ -1,5 +1,5 @@
 use crate::client::ClientControllerProxy;
-use anyhow::Result;
+use anyhow::*;
 use mahjong::{game::*, messages::MatchEvent, strum::IntoEnumIterator, tile};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
@@ -62,6 +62,16 @@ impl MatchController {
 
     pub fn state(&self) -> MatchState {
         self.state.clone()
+    }
+
+    pub fn join(&mut self, controller: ClientControllerProxy, seat: Wind) -> Result<()> {
+        if self.clients.contains_key(&seat) {
+            bail!("Seat is already occupied");
+        }
+
+        self.clients.insert(seat, controller);
+
+        Ok(())
     }
 
     /// Returns the updated match state if the requested discard is valid.
