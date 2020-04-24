@@ -4,7 +4,7 @@
 // framework once we move the communication layer into Rust.
 
 use crate::{
-    game::{MatchId, MatchState},
+    match_state::{MatchId, MatchState},
     tile::{TileId, Wind},
 };
 use cs_bindgen::prelude::*;

@@ -1,6 +1,6 @@
 use crate::{client::*, match_controller::*};
 use futures::prelude::*;
-use mahjong::{game::*, messages::*};
+use mahjong::{match_state::*, messages::*};
 use std::{collections::HashMap, sync::Arc};
 use thespian::*;
 use tracing::*;

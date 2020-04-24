@@ -1,6 +1,6 @@
 use crate::client::ClientControllerProxy;
 use anyhow::*;
-use mahjong::{game::*, messages::MatchEvent, strum::IntoEnumIterator, tile};
+use mahjong::{match_state::*, messages::MatchEvent, strum::IntoEnumIterator, tile};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
 use std::collections::HashMap;

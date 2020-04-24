@@ -1,4 +1,4 @@
-use crate::{game::*, messages::*};
+use crate::{match_state::*, messages::*};
 use cs_bindgen::prelude::*;
 use tracing::*;
 
@@ -7,7 +7,7 @@ use tracing::*;
 // and ensuring that both crates use the same versions of any shared dependencies.
 pub use strum;
 
-pub mod game;
+pub mod match_state;
 pub mod messages;
 pub mod tile;
 
