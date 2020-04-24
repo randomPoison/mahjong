@@ -194,6 +194,8 @@ impl ClientController {
     // TODO: Generalize this to work for all kinds of server-sent events once we have
     // other events to send.
     pub async fn send_event(&mut self, event: MatchEvent) {
+        trace!(id = %self.id, ?event, "Sending a server event to the client");
+
         assert!(
             matches!(self.state, ClientState::InMatch { .. }),
             "Received match event when client wasn't in a match"

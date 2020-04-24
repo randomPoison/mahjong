@@ -68,7 +68,7 @@ impl MatchState {
 
     /// Draws the next tile from the wall and puts it in a player's draw slot.
     #[throws(InsufficientTiles)]
-    pub fn draw_into_hand(&mut self, seat: Wind) -> TileId {
+    pub fn draw_into_hand(&mut self, seat: Wind) -> TileInstance {
         let player = self.players.get_mut(&seat).unwrap();
 
         let tile = self
@@ -77,7 +77,7 @@ impl MatchState {
             .ok_or(InsufficientTiles::new(self.wall.len(), 1))?;
         player.current_draw = Some(tile);
 
-        tile.id
+        tile
     }
 
     #[throws(InvalidDiscard)]
@@ -145,6 +145,11 @@ impl MatchState {
         self.discard_tile(seat, tile).is_ok()
     }
 
+    // TODO: Remove this function once we can export `draw_tile` directly.
+    pub fn try_draw_tile(&mut self, seat: Wind) -> bool {
+        self.draw_into_hand(seat).is_ok()
+    }
+
     /// Creates the request message for sending the discard action to the server.
     pub fn request_discard_tile(&mut self, player: Wind, tile: TileId) -> String {
         let request = ClientRequest::DiscardTile(DiscardTileRequest {
@@ -155,8 +160,34 @@ impl MatchState {
         serde_json::to_string(&request).unwrap()
     }
 
-    pub fn deserialize_event(json: String) -> MatchEvent {
-        serde_json::from_str(&json).unwrap()
+    pub fn handle_event(&mut self, json: String) -> MatchEvent {
+        let event = serde_json::from_str(&json).unwrap();
+
+        // Apply the event to the local state.
+        match &event {
+            &MatchEvent::TileDiscarded { seat, tile } => {
+                assert_eq!(
+                    self.current_turn, seat,
+                    "Draw event does not match current turn"
+                );
+
+                self.discard_tile(seat, tile)
+                    .expect("Failed to discard locally");
+            }
+
+            &MatchEvent::TileDrawn { seat, tile } => {
+                assert_eq!(
+                    self.current_turn, seat,
+                    "Draw event does not match current turn"
+                );
+
+                let draw = self.draw_into_hand(seat).expect("Unable to draw locally");
+                assert_eq!(draw.id, tile, "Local draw does not match draw event");
+            }
+        }
+
+        // Forward the event to the host environment
+        event
     }
 }
 

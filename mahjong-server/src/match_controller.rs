@@ -43,7 +43,11 @@ impl MatchController {
     }
 
     async fn broadcast(&mut self, event: MatchEvent) {
-        trace!(?event, "Broadcasting event to connected clients");
+        trace!(
+            ?event,
+            "Broadcasting event to {} connected client(s)",
+            self.clients.len()
+        );
 
         for client in self.clients.values_mut() {
             client
@@ -95,7 +99,7 @@ impl MatchController {
             let draw = self.state.draw_into_hand(current_turn)?;
             self.broadcast(MatchEvent::TileDrawn {
                 seat: current_turn,
-                tile: draw,
+                tile: draw.id,
             })
             .await;
 

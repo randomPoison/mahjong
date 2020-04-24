@@ -38,6 +38,10 @@ namespace Synapse.Mahjong.Match
 
         private WebSocket _socket;
         private ClientState _client;
+
+        // TODO: Move the tracking for sever state vs local state into the Rust layer.
+        // It'll be easier to write and test the reconciliation logic there, and would
+        // allow us to simplify the client code.
         private MatchState _serverState;
         private MatchState _localState;
 
@@ -102,17 +106,51 @@ namespace Synapse.Mahjong.Match
             // Process incoming updates from the server.
             while (true)
             {
+                // Wait to receive the next update from the server.
                 var eventJson = await _socket.RecvStringAsync(_cancellation.Token);
-                IMatchEvent update = MatchState.DeserializeEvent(eventJson);
+                Debug.Log(eventJson, this);
+
+                // Feed the incoming event into the server state.
+                IMatchEvent update = _serverState.HandleEvent(eventJson);
+
+                // Apply the received update to the local state, updating both the game
+                // state tracking and the visual state.
                 switch (update)
                 {
                     case MatchEvent.TileDrawn drawEvent:
+                    {
+                        // Update the game state tracking for the client.
+                        if (!_localState.TryDrawTile(drawEvent.Seat))
+                        {
+                            // TODO: Handle the client being out of sync with the server.
+                            throw new NotImplementedException("Client out of sync with server");
+                        }
 
-                        break;
+                        var draw = _localState.CurrentDraw(drawEvent.Seat);
+                        Debug.Assert(
+                            drawEvent.Tile.Element0 == draw.Id.Element0,
+                            "Drew incorrect tile when simulating locally",
+                            this);
+
+                        // Update the visuals based on the draw event.
+                        var hand = _hands[(int)drawEvent.Seat];
+                        var tileObject = InstantiateTile(draw);
+                        hand.DrawTile(tileObject);
+                    }
+                    break;
 
                     case MatchEvent.TileDiscarded discardEvent:
+                    {
+                        if (!_localState.TryDiscardTile(discardEvent.Seat, discardEvent.Tile))
+                        {
+                            // TODO: Handle the client being out of sync with the server.
+                            throw new NotImplementedException("Client out of sync with server");
+                        }
 
-                        break;
+                        var hand = _hands[(int)discardEvent.Seat];
+                        hand.MoveToDiscard(discardEvent.Tile);
+                    }
+                    break;
                 }
             }
 
@@ -123,7 +161,6 @@ namespace Synapse.Mahjong.Match
                 var request = _client.CreateStartMatchRequest();
                 _socket.SendString(request);
                 var responseJson = await _socket.RecvStringAsync(cancellation);
-                Debug.Log(responseJson, this);
 
                 // TODO: Add some kind of error handling around failure. Probably not doable
                 // until we can return more structured data from Rust functions.
