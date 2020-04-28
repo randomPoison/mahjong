@@ -58,8 +58,8 @@ async fn main() {
 
                                 let result = client
                                     .handle_message(message)
-                                    .await
-                                    .expect("Failed to communicate with client actor");
+                                    .expect("Failed to communicate with client actor")
+                                    .await;
 
                                 if let Err(err) = result {
                                     error!("Error handling client message: {:?}", err);

@@ -4,7 +4,7 @@ use mahjong::{match_state::*, messages::MatchEvent, strum::IntoEnumIterator, til
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
 use std::collections::HashMap;
-use thespian::*;
+use thespian::Actor;
 use tile::{TileId, Wind};
 use tracing::*;
 
@@ -52,7 +52,6 @@ impl MatchController {
         for client in self.clients.values_mut() {
             client
                 .send_event(event.clone())
-                .await
                 .expect("Disconnected from client controller");
         }
     }
@@ -64,18 +63,14 @@ impl MatchController {
         self.state.id
     }
 
-    pub fn state(&self) -> MatchState {
-        self.state.clone()
-    }
-
-    pub fn join(&mut self, controller: ClientControllerProxy, seat: Wind) -> Result<()> {
+    pub fn join(&mut self, controller: ClientControllerProxy, seat: Wind) -> Result<MatchState> {
         if self.clients.contains_key(&seat) {
             bail!("Seat is already occupied");
         }
 
         self.clients.insert(seat, controller);
 
-        Ok(())
+        Ok(self.state.clone())
     }
 
     /// Returns the updated match state if the requested discard is valid.

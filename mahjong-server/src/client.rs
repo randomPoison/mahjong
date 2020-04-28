@@ -7,7 +7,7 @@ use futures::{
 };
 use mahjong::{messages::*, tile::Wind};
 use std::sync::atomic::{AtomicU64, Ordering};
-use thespian::*;
+use thespian::{Actor, Remote, StageBuilder};
 use tracing::*;
 use warp::{filters::ws::Message as WsMessage, ws::WebSocket};
 
@@ -83,7 +83,7 @@ impl ClientController {
         // did not provide credentials for an existing account.
         let account = match request.credentials {
             Some(..) => todo!("Support logging into an existing account"),
-            None => game.create_account().await?,
+            None => game.create_account()?.await,
         };
 
         info!("Verified handshake request, completing client connection");
@@ -145,25 +145,17 @@ impl ClientController {
 
                 trace!("Asking the game controller to start a match...");
 
-                let mut controller = self
-                    .game
-                    .start_match()
-                    .await
-                    .expect("Failed to start match");
+                let mut controller = self.game.start_match().unwrap().await;
 
                 // Join the match as the East player.
-                controller
+                let state = controller
                     .join(self.remote.proxy(), Wind::East)
+                    .unwrap()
                     .await
-                    .expect("Disconnected from the match controller???")
-                    .expect("Failed to join match, even though we just created it???");
+                    .expect("Failed to join the match that we just started???");
 
                 trace!("Match started, joined as East player");
 
-                let state = controller
-                    .state()
-                    .await
-                    .expect("Failed to get initial state from match controller");
                 let response = serde_json::to_string(&StartMatchResponse { state })
                     .expect("Failed to serialize `StartMatchResponse`");
                 self.send_text(response).await?;
@@ -180,10 +172,15 @@ impl ClientController {
 
                 trace!("Forwarding discard request to match controller");
 
-                controller
+                let result = controller
                     .discard_tile(request.player, request.tile)
-                    .await
-                    .expect("Match controller died before match ended")?;
+                    .expect("Match controller died before match ended")
+                    .await;
+
+                match result {
+                    Ok(()) => {}
+                    Err(err) => todo!("Notify client that discard failed? {}", err),
+                }
             }
         }
 
