@@ -88,25 +88,30 @@ impl MatchController {
             .await;
 
         while !self.state.wall.is_empty() {
-            let current_turn = self.state.current_turn;
+            let player = self.state.current_turn;
 
             // Draw the tile for the next player.
-            let draw = self.state.draw_into_hand(current_turn)?;
+            let draw = self.state.draw_into_hand(player)?;
             self.broadcast(MatchEvent::TileDrawn {
-                seat: current_turn,
+                seat: player,
                 tile: draw.id,
             })
             .await;
 
-            if self.clients.contains_key(&current_turn) {
-                trace!(seat = ?current_turn, "Client at current seat, waiting for player action");
+            if self.clients.contains_key(&player) {
+                trace!(seat = ?player, "Client at current seat, waiting for player action");
                 break;
             }
 
             // Automatically discard the first tile in the player's hand.
-            trace!(seat = ?current_turn, "Performing action for computer-controlled player");
-            let auto_discard = self.state.player(current_turn).hand[0].id;
-            self.state.discard_tile(current_turn, auto_discard)?;
+            let auto_discard = self.state.player(player).hand[0].id;
+            info!(
+                seat = ?player,
+                discard = ?auto_discard,
+                "Performing action for computer-controlled player",
+            );
+
+            self.state.discard_tile(player, auto_discard)?;
             self.broadcast(MatchEvent::TileDiscarded {
                 seat: player,
                 tile: auto_discard,
