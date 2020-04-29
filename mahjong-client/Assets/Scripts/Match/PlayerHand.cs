@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using Synapse.Utils;
+using UniRx.Async;
 using UnityEngine;
 
 namespace Synapse.Mahjong.Match
@@ -144,6 +146,23 @@ namespace Synapse.Mahjong.Match
             {
                 AddToHand(_currentDraw);
                 _currentDraw = null;
+            }
+        }
+
+        public UniTask<TileId> OnClickTileAsync(CancellationToken cancellation = default)
+        {
+            var completion = new UniTaskCompletionSource<TileId>();
+            TileClicked += Handler;
+            cancellation.Register(() =>
+            {
+                completion.TrySetCanceled();
+            });
+            return completion.Task;
+
+            void Handler(PlayerHand hand, TileId id)
+            {
+                completion.TrySetResult(id);
+                TileClicked -= Handler;
             }
         }
 

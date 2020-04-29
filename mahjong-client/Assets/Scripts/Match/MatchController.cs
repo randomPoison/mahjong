@@ -89,7 +89,6 @@ namespace Synapse.Mahjong.Match
 
             // Register input events from the player's hand.
             var playerHand = _hands[(int)_seat];
-            playerHand.TileClicked += OnTileClicked;
 
             // Once we have the match data, instantiate the tiles for each player's
             // starting hand.
@@ -114,6 +113,12 @@ namespace Synapse.Mahjong.Match
                     var currentDraw = _localState.CurrentDraw(seat);
                     hand.DrawTile(InstantiateTile(currentDraw));
                 }
+            }
+
+            // If the local player has the first turn, have them discard a tile now.
+            if (_localState.CurrentTurn() == _seat)
+            {
+                await DiscardTile();
             }
 
             // Process incoming updates from the server.
@@ -150,6 +155,17 @@ namespace Synapse.Mahjong.Match
                         var hand = _hands[(int)draw.Seat];
                         var tileObject = InstantiateTile(localDraw);
                         hand.DrawTile(tileObject);
+
+                        // If the local player was the one that drew the tile, have them discard a
+                        // tile now.
+                        if (draw.Seat == _seat)
+                        {
+                            Debug.Assert(
+                                _localState.CurrentTurn() == _seat,
+                                "Player drew a tile but it's not their turn???");
+
+                            await DiscardTile();
+                        }
                     }
                     break;
 
@@ -228,6 +244,36 @@ namespace Synapse.Mahjong.Match
             }
         }
 
+        private async UniTask DiscardTile()
+        {
+            var hand = _hands[(int)_seat];
+            var id = await hand.OnClickTileAsync(_cancellation.Token);
+
+            // Attempt to discard the tile. If the operation fails, ignore the click event.
+            if (!_localState.TryDiscardTile(hand.Seat, id))
+            {
+                throw new NotImplementedException(
+                    "What does it mean if the tile click fails here?");
+            }
+
+            // Track which tile we've discarded locally. This will allow us to reconcile
+            // our local state with the server's state once we receive updates from the
+            // server.
+            Debug.Assert(
+                !_lastDiscard.HasValue,
+                "Discarding a tile when the last discard still hasn't been processed",
+                this);
+            _lastDiscard = id;
+
+            // Send the tile to the graveyard!
+            hand.MoveToDiscard(id);
+
+            // If the local attempt to discard the tile succeeded, send a request to the
+            // server to perform the action.
+            var request = _serverState.RequestDiscardTile(hand.Seat, id);
+            _socket.SendString(request);
+        }
+
         #region Unity Lifecycle Methods
 
         private void Awake()
@@ -262,42 +308,6 @@ namespace Synapse.Mahjong.Match
         }
 
         #endregion
-
-        private void OnTileClicked(PlayerHand hand, TileId id)
-        {
-            // Do nothing if the player clicked on their tile when it wasn't their turn.
-            if (_localState.CurrentTurn() != hand.Seat)
-            {
-                return;
-            }
-
-            // Attempt to discard the tile. If the operation fails, ignore the click event.
-            //
-            // TODO: Show some kind of feedback when the discard attempt fails. To
-            // handle this well we would need to be able to get more structured error
-            // data back from the Rust side.
-            if (!_localState.TryDiscardTile(hand.Seat, id))
-            {
-                return;
-            }
-
-            // Track which tile we've discarded locally. This will allow us to reconcile
-            // our local state with the server's state once we receive updates from the
-            // server.
-            Debug.Assert(
-                !_lastDiscard.HasValue,
-                "Discarding a tile when the last discard still hasn't been processed",
-                this);
-            _lastDiscard = id;
-
-            // Send the tile to the graveyard!
-            hand.MoveToDiscard(id);
-
-            // If the local attempt to discard the tile succeeded, send a request to the
-            // server to perform the action.
-            var request = _serverState.RequestDiscardTile(hand.Seat, id);
-            _socket.SendString(request);
-        }
 
         #region Tile Asset Handling
 
