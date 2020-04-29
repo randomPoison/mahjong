@@ -27,14 +27,12 @@ pub struct ClientController {
 impl ClientController {
     /// Attempts to perform the session handshake with the client, returning a new
     /// `ClientConnection` if it succeeds.
+    #[instrument(skip(socket, game))]
     pub async fn perform_handshake(
         id: ClientId,
         socket: WebSocket,
         mut game: <GameState as Actor>::Proxy,
     ) -> Result<(<ClientController as Actor>::Proxy, SplitStream<WebSocket>)> {
-        let span = info_span!("perform_handshake", %id);
-        let _span = span.enter();
-
         info!("Starting client handshake");
 
         let (mut sink, mut stream) = socket.split();

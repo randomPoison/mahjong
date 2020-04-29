@@ -42,7 +42,7 @@ impl MatchController {
         }
     }
 
-    async fn broadcast(&mut self, event: MatchEvent) {
+    fn broadcast(&mut self, event: MatchEvent) {
         trace!(
             ?event,
             "Broadcasting event to {} connected client(s)",
@@ -76,16 +76,27 @@ impl MatchController {
     /// Returns the updated match state if the requested discard is valid.
     #[tracing::instrument(skip(self))]
     pub async fn discard_tile(&mut self, player: Wind, tile: TileId) -> Result<()> {
+        trace!("Attempting to discard tile");
+
+        // TODO: Provide more robust state transitions such that it's not possible to get
+        // this far after the match has ended, e.g. a `MatchControllerState` enum that has
+        // different states for whether the match is ongoing or completed.
+        if self.state.wall.is_empty() {
+            bail!("Match already finished");
+        }
+
         // TODO: Verify that the client submitting the action is actually the one that
         // controls the player.
 
         self.state.discard_tile(player, tile)?;
 
-        trace!("Successfully discarded tile");
+        trace!(
+            tiles_remaining = self.state.player(player).hand.len(),
+            "Successfully discarded tile"
+        );
 
         // Broadcast the discard event to all connected clients.
-        self.broadcast(MatchEvent::TileDiscarded { seat: player, tile })
-            .await;
+        self.broadcast(MatchEvent::TileDiscarded { seat: player, tile });
 
         while !self.state.wall.is_empty() {
             let player = self.state.current_turn;
@@ -95,8 +106,7 @@ impl MatchController {
             self.broadcast(MatchEvent::TileDrawn {
                 seat: player,
                 tile: draw.id,
-            })
-            .await;
+            });
 
             if self.clients.contains_key(&player) {
                 trace!(seat = ?player, "Client at current seat, waiting for player action");
@@ -108,6 +118,7 @@ impl MatchController {
             info!(
                 seat = ?player,
                 discard = ?auto_discard,
+                tiles_in_hand = self.state.player(player).hand.len(),
                 "Performing action for computer-controlled player",
             );
 
@@ -115,8 +126,12 @@ impl MatchController {
             self.broadcast(MatchEvent::TileDiscarded {
                 seat: player,
                 tile: auto_discard,
-            })
-            .await;
+            });
+        }
+
+        // If the match is over, broadcast an event notifying all clients of the outcome.
+        if self.state.wall.is_empty() {
+            self.broadcast(MatchEvent::MatchEnded);
         }
 
         Ok(())

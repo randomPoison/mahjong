@@ -106,4 +106,8 @@ pub struct DiscardTileRequest {
 pub enum MatchEvent {
     TileDrawn { seat: Wind, tile: TileId },
     TileDiscarded { seat: Wind, tile: TileId },
+
+    // TODO: Include winner and scoring info. This requires support for `Option`, since
+    // there may not be a winner.
+    MatchEnded,
 }

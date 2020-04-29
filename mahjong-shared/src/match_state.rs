@@ -184,6 +184,8 @@ impl MatchState {
                 let draw = self.draw_into_hand(seat).expect("Unable to draw locally");
                 assert_eq!(draw.id, tile, "Local draw does not match draw event");
             }
+
+            MatchEvent::MatchEnded => {}
         }
 
         // Forward the event to the host environment

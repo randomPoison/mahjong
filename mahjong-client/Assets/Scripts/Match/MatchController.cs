@@ -6,6 +6,7 @@ using Synapse.Utils;
 using UniRx.Async;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using UnityEngine.UI;
 
 namespace Synapse.Mahjong.Match
 {
@@ -31,6 +32,10 @@ namespace Synapse.Mahjong.Match
         [SerializeField] private AssetReferenceGameObject[] _characterTiles = default;
         [SerializeField] private AssetReferenceGameObject[] _dragonTiles = default;
         [SerializeField] private AssetReferenceGameObject[] _windTiles = default;
+
+        [Header("UI Elements")]
+        [SerializeField] private GameObject _matchEndedDisplayRoot = default;
+        [SerializeField] private Button _exitButton = default;
 
         #endregion
 
@@ -112,7 +117,8 @@ namespace Synapse.Mahjong.Match
             }
 
             // Process incoming updates from the server.
-            while (true)
+            var matchEnded = false;
+            while (!matchEnded)
             {
                 // Wait to receive the next update from the server.
                 var eventJson = await _socket.RecvStringAsync(_cancellation.Token);
@@ -125,29 +131,29 @@ namespace Synapse.Mahjong.Match
                 // state tracking and the visual state.
                 switch (update)
                 {
-                    case MatchEvent.TileDrawn drawEvent:
+                    case MatchEvent.TileDrawn draw:
                     {
                         // Update the game state tracking for the client.
-                        if (!_localState.TryDrawTile(drawEvent.Seat))
+                        if (!_localState.TryDrawTile(draw.Seat))
                         {
                             // TODO: Handle the client being out of sync with the server.
                             throw new NotImplementedException("Client out of sync with server");
                         }
 
-                        var draw = _localState.CurrentDraw(drawEvent.Seat);
+                        var localDraw = _localState.CurrentDraw(draw.Seat);
                         Debug.Assert(
-                            drawEvent.Tile.Element0 == draw.Id.Element0,
+                            draw.Tile.Element0 == localDraw.Id.Element0,
                             "Drew incorrect tile when simulating locally",
                             this);
 
                         // Update the visuals based on the draw event.
-                        var hand = _hands[(int)drawEvent.Seat];
-                        var tileObject = InstantiateTile(draw);
+                        var hand = _hands[(int)draw.Seat];
+                        var tileObject = InstantiateTile(localDraw);
                         hand.DrawTile(tileObject);
                     }
                     break;
 
-                    case MatchEvent.TileDiscarded discardEvent:
+                    case MatchEvent.TileDiscarded discard:
                     {
                         // If we performed a discard event locally, the next discard event from
                         // the server should match the one we performed. Verify that's the case
@@ -157,35 +163,48 @@ namespace Synapse.Mahjong.Match
                         // the local state is still in sync with the server state.
                         if (_lastDiscard is TileId lastDiscard)
                         {
-                            if (discardEvent.Seat != _seat
-                                || discardEvent.Tile.Element0 != lastDiscard.Element0)
+                            if (discard.Seat != _seat
+                                || discard.Tile.Element0 != lastDiscard.Element0)
                             {
                                 throw new OutOfSyncException(
                                     $"Previously discarded tile {lastDiscard}, but received" +
-                                    $"discard event {discardEvent}");
+                                    $"discard event {discard}");
                             }
 
                             // Clear local tracking for discarded tile now that the server has
                             // caught up.
                             _lastDiscard = null;
                         }
-                        else if (_localState.TryDiscardTile(discardEvent.Seat, discardEvent.Tile))
+                        else if (_localState.TryDiscardTile(discard.Seat, discard.Tile))
                         {
                             // Perform the discard action locally.
-                            var hand = _hands[(int)discardEvent.Seat];
-                            hand.MoveToDiscard(discardEvent.Tile);
+                            var hand = _hands[(int)discard.Seat];
+                            hand.MoveToDiscard(discard.Tile);
                         }
                         else
                         {
-                            throw new OutOfSyncException($"Could not apply discard event locally: {discardEvent}");
+                            throw new OutOfSyncException($"Could not apply discard event locally: {discard}");
                         }
 
                         // TODO: Reconcile our local state with the updated server state to
                         // verify that the two are in sync.
                     }
                     break;
+
+                    case MatchEvent.MatchEnded _:
+                    {
+                        matchEnded = true;
+                    }
+                    break;
                 }
             }
+
+            // Display that the match ended UI and wait for the player to hit the exit button.
+            _matchEndedDisplayRoot.SetActive(true);
+            await _exitButton.OnClickAsync(_cancellation.Token);
+
+            // TODO: Leave the match. But, like, in a cool way.
+            throw new NotImplementedException("Return to the home screen");
 
             // Helper method to handle requesting match creation from the server.
             async UniTask RequestStartMatch(CancellationToken cancellation = default)
