@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using Synapse.Utils;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 namespace Synapse.Mahjong.Match
 {

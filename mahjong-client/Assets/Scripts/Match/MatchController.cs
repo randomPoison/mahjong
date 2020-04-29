@@ -45,6 +45,13 @@ namespace Synapse.Mahjong.Match
         private MatchState _serverState;
         private MatchState _localState;
 
+        private Wind _seat;
+
+        // Tracking for the most recent discard action that the player performed, used
+        // to handle forward-simulation and state verification after the client receives
+        // match updates from the server.
+        private TileId? _lastDiscard;
+
         // Cached prefabs for the different tiles. These are populated during startup
         // based on the asset references configured above.
         private GameObject[] _bambooPrefabs = new GameObject[9];
@@ -71,11 +78,12 @@ namespace Synapse.Mahjong.Match
                 RequestStartMatch(_cancellation.Token),
                 LoadTilePrefabs(_cancellation.Token));
 
-            // Register input events from the player's hand.
-            //
             // TODO: Have the server data specify which player is controlled by this
             // client, rather than hard coding it to always control the east seat.
-            var playerHand = _hands[(int)Wind.East];
+            _seat = Wind.East;
+
+            // Register input events from the player's hand.
+            var playerHand = _hands[(int)_seat];
             playerHand.TileClicked += OnTileClicked;
 
             // Once we have the match data, instantiate the tiles for each player's
@@ -141,14 +149,39 @@ namespace Synapse.Mahjong.Match
 
                     case MatchEvent.TileDiscarded discardEvent:
                     {
-                        if (!_localState.TryDiscardTile(discardEvent.Seat, discardEvent.Tile))
+                        // If we performed a discard event locally, the next discard event from
+                        // the server should match the one we performed. Verify that's the case
+                        // and reconcile our local state with the server state.
+                        //
+                        // Otherwise, perform the action on the local state and then verify that
+                        // the local state is still in sync with the server state.
+                        if (_lastDiscard is TileId lastDiscard)
                         {
-                            // TODO: Handle the client being out of sync with the server.
-                            throw new NotImplementedException("Client out of sync with server");
+                            if (discardEvent.Seat != _seat
+                                || discardEvent.Tile.Element0 != lastDiscard.Element0)
+                            {
+                                throw new OutOfSyncException(
+                                    $"Previously discarded tile {lastDiscard}, but received" +
+                                    $"discard event {discardEvent}");
+                            }
+
+                            // Clear local tracking for discarded tile now that the server has
+                            // caught up.
+                            _lastDiscard = null;
+                        }
+                        else if (_localState.TryDiscardTile(discardEvent.Seat, discardEvent.Tile))
+                        {
+                            // Perform the discard action locally.
+                            var hand = _hands[(int)discardEvent.Seat];
+                            hand.MoveToDiscard(discardEvent.Tile);
+                        }
+                        else
+                        {
+                            throw new OutOfSyncException($"Could not apply discard event locally: {discardEvent}");
                         }
 
-                        var hand = _hands[(int)discardEvent.Seat];
-                        hand.MoveToDiscard(discardEvent.Tile);
+                        // TODO: Reconcile our local state with the updated server state to
+                        // verify that the two are in sync.
                     }
                     break;
                 }
@@ -228,6 +261,15 @@ namespace Synapse.Mahjong.Match
             {
                 return;
             }
+
+            // Track which tile we've discarded locally. This will allow us to reconcile
+            // our local state with the server's state once we receive updates from the
+            // server.
+            Debug.Assert(
+                !_lastDiscard.HasValue,
+                "Discarding a tile when the last discard still hasn't been processed",
+                this);
+            _lastDiscard = id;
 
             // Send the tile to the graveyard!
             hand.MoveToDiscard(id);
