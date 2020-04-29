@@ -203,8 +203,8 @@ impl TileInstance {
 }
 
 /// Generates a complete set of Mahjong tiles, including bonus tiles.
-// TODO: Make this configurable, such that we can generate tile sets for different
-// styles of game without needing a bunch of different functions.
+///
+/// The tiles are not shuffled, and will always be in the same initial order.
 pub fn generate_tileset() -> Vec<TileInstance> {
     let mut tiles = Vec::with_capacity(144);
     let mut id_generator = TileIdGenerator::default();

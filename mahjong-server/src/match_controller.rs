@@ -29,11 +29,11 @@ impl MatchController {
 
         // Deal each player their initial 13 tiles.
         for seat in Wind::iter() {
-            state.draw_for_player(seat, 13).unwrap();
+            state.draw_initial_tiles(seat, 13).unwrap();
         }
 
         // For the east player, have them draw the tile for their first turn.
-        state.draw_into_hand(Wind::East).unwrap();
+        state.draw_for_player(Wind::East).unwrap();
 
         Self {
             rng,
@@ -90,10 +90,7 @@ impl MatchController {
 
         self.state.discard_tile(player, tile)?;
 
-        trace!(
-            tiles_remaining = self.state.player(player).hand.len(),
-            "Successfully discarded tile"
-        );
+        trace!("Successfully discarded tile");
 
         // Broadcast the discard event to all connected clients.
         self.broadcast(MatchEvent::TileDiscarded { seat: player, tile });
@@ -102,7 +99,7 @@ impl MatchController {
             let player = self.state.current_turn;
 
             // Draw the tile for the next player.
-            let draw = self.state.draw_into_hand(player)?;
+            let draw = self.state.draw_for_player(player)?;
             self.broadcast(MatchEvent::TileDrawn {
                 seat: player,
                 tile: draw.id,
@@ -118,7 +115,6 @@ impl MatchController {
             info!(
                 seat = ?player,
                 discard = ?auto_discard,
-                tiles_in_hand = self.state.player(player).hand.len(),
                 "Performing action for computer-controlled player",
             );
 

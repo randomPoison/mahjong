@@ -50,9 +50,13 @@ impl MatchState {
 
     /// Draws `count` tiles from the wall directly into a player's hand.
     ///
+    /// This method should only be used when setting up the player's starting hand,
+    /// since it adds the drawn tile(s) directly to the player's hand without giving
+    /// them a chance to discard.
+    ///
     /// If there are fewer than `count` tiles left in the wall, no tiles are drawn.
     #[throws(InsufficientTiles)]
-    pub fn draw_for_player(&mut self, seat: Wind, count: usize) {
+    pub fn draw_initial_tiles(&mut self, seat: Wind, count: usize) {
         let player = self.players.get_mut(&seat).unwrap();
 
         // Check if there are enough tiles for the draw before actually drawing any, that
@@ -68,7 +72,7 @@ impl MatchState {
 
     /// Draws the next tile from the wall and puts it in a player's draw slot.
     #[throws(InsufficientTiles)]
-    pub fn draw_into_hand(&mut self, seat: Wind) -> TileInstance {
+    pub fn draw_for_player(&mut self, seat: Wind) -> TileInstance {
         let player = self.players.get_mut(&seat).unwrap();
 
         let tile = self
@@ -90,14 +94,17 @@ impl MatchState {
         }
 
         let player = self.players.get_mut(&seat).unwrap();
+        assert!(
+            player.current_draw.is_some(),
+            "Player didn't have a draw when discarding"
+        );
+
         let tile = player
             .remove_from_hand(tile)
             .or_else(|| {
-                if player
-                    .current_draw
-                    .map(|draw| draw.id == tile)
-                    .unwrap_or(false)
-                {
+                // NOTE: The unwrap is valid here because a player will always have a current draw
+                // when discarding.
+                if player.current_draw.unwrap().id == tile {
                     player.current_draw.take()
                 } else {
                     None
@@ -105,6 +112,11 @@ impl MatchState {
             })
             .ok_or(InvalidDiscard::TileNotInHand)?;
         player.discards.push(tile);
+
+        // If the player didn't discard their current draw, move the draw into their hand.
+        if let Some(draw) = player.current_draw.take() {
+            player.hand.push(draw);
+        }
 
         // Update to the next player's turn, cycling through the seats in wind order.
         self.current_turn = self.current_turn.next();
@@ -147,7 +159,7 @@ impl MatchState {
 
     // TODO: Remove this function once we can export `draw_tile` directly.
     pub fn try_draw_tile(&mut self, seat: Wind) -> bool {
-        self.draw_into_hand(seat).is_ok()
+        self.draw_for_player(seat).is_ok()
     }
 
     /// Creates the request message for sending the discard action to the server.
@@ -181,7 +193,7 @@ impl MatchState {
                     "Draw event does not match current turn"
                 );
 
-                let draw = self.draw_into_hand(seat).expect("Unable to draw locally");
+                let draw = self.draw_for_player(seat).expect("Unable to draw locally");
                 assert_eq!(draw.id, tile, "Local draw does not match draw event");
             }
 
