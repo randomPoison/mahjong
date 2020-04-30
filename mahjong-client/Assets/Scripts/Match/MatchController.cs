@@ -71,7 +71,7 @@ namespace Synapse.Mahjong.Match
 
         #endregion
 
-        public async void Init(ClientState client, WebSocket socket)
+        public async UniTask<NextScreen> Run(ClientState client, WebSocket socket)
         {
             _client = client;
             _socket = socket;
@@ -127,7 +127,6 @@ namespace Synapse.Mahjong.Match
             {
                 // Wait to receive the next update from the server.
                 var eventJson = await _socket.RecvStringAsync(_cancellation.Token);
-                Debug.Log(eventJson, this);
 
                 // Feed the incoming event into the server state.
                 IMatchEvent update = _serverState.HandleEvent(eventJson);
@@ -219,8 +218,8 @@ namespace Synapse.Mahjong.Match
             _matchEndedDisplayRoot.SetActive(true);
             await _exitButton.OnClickAsync(_cancellation.Token);
 
-            // TODO: Leave the match. But, like, in a cool way.
-            throw new NotImplementedException("Return to the home screen");
+            // Exit the match, indicating that we should return to the home screen.
+            return NextScreen.Home;
 
             // Helper method to handle requesting match creation from the server.
             async UniTask RequestStartMatch(CancellationToken cancellation = default)
@@ -244,6 +243,17 @@ namespace Synapse.Mahjong.Match
             }
         }
 
+        /// <summary>
+        /// Waits for the player to select a tile to discard, then performs the discard.
+        /// </summary>
+        ///
+        /// <returns>
+        /// A task that resolves once the discard action has finished.
+        /// </returns>
+        ///
+        /// <remarks>
+        /// 
+        /// </remarks>
         private async UniTask DiscardTile()
         {
             var hand = _hands[(int)_seat];

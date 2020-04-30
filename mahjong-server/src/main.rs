@@ -67,7 +67,7 @@ async fn main() {
                             }
 
                             Err(err) => {
-                                error!(%err, "Received error message from socket");
+                                info!(%err, "Received error message from socket, cancelling connection");
                                 break;
                             }
                         }

@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Synapse.Mahjong.Match;
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using UniRx.Async;
 using UnityEngine;
@@ -14,6 +16,11 @@ namespace Synapse.Mahjong
     {
         private WebSocket _socket;
         private ClientState _state;
+
+        private void Awake()
+        {
+            DontDestroyOnLoad(gameObject);
+        }
 
         private async void Start()
         {
@@ -54,13 +61,42 @@ namespace Synapse.Mahjong
                 Debug.Log($"Handshake completed, account ID: {_state.AccountId()}, points balance: {_state.Points()}");
 
                 // Load the home screen once everything has been loaded.
-                await SceneManager.LoadSceneAsync("Home", LoadSceneMode.Additive);
+                await SceneManager.LoadSceneAsync("Home");
 
                 // Once the home screen has loaded, initialize the home screen controller.
-                var homeController = FindObjectOfType<HomeController>();
-                homeController.Init(_state, _socket);
+                var nextScreen = await FindObjectOfType<HomeController>().Run(_state);
 
-                // TODO: Wait for something to happen I guess?
+                while (true)
+                {
+                    switch (nextScreen)
+                    {
+                        case NextScreen.Home:
+                        {
+                            // Unload the current scene and load the home scene.
+                            await SceneManager.LoadSceneAsync("Home");
+
+                            // Transfer control to the home controller and wait for it to finish.
+                            nextScreen = await FindObjectOfType<HomeController>().Run(_state);
+                        }
+                        break;
+
+                        case NextScreen.Match:
+                        {
+                            // Unload the current scene and load the gameplay scene.
+                            await SceneManager.LoadSceneAsync("Gameplay");
+
+                            // Transfer control to the match controller and wait for it finish.
+                            nextScreen = await FindObjectOfType<MatchController>().Run(_state, _socket);
+                        }
+                        break;
+
+                        default:
+                        {
+                            throw new NotImplementedException(
+                                $"Unhandled value for next screen: {nextScreen}");
+                        }
+                    }
+                }
             }
             catch (TaskCanceledException exception)
             {

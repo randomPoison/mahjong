@@ -17,10 +17,6 @@ namespace Synapse.Mahjong
         [SerializeField] private TextMeshProUGUI _pointsDisplay = null;
         [SerializeField] private Button _playButton = null;
 
-        private WebSocket _socket;
-        private ClientState _state;
-        private Scene _scene;
-
         /// <summary>
         /// Initializes the controller. Must be called immediately upon loading the home
         /// screen in order to correctly initialize the scene.
@@ -29,26 +25,16 @@ namespace Synapse.Mahjong
         /// <param name="state">
         /// The <see cref="ClientState"/> object for the current client.
         /// </param>
-        public void Init(ClientState state, WebSocket socket)
+        public async UniTask<NextScreen> Run(ClientState state)
         {
-            _state = state;
-            _socket = socket;
-            _scene = SceneManager.GetSceneByName("Home");
+            _accountIdDisplay.text = state.AccountId().ToString();
+            _pointsDisplay.text = state.Points().ToString();
 
-            _accountIdDisplay.text = _state.AccountId().ToString();
-            _pointsDisplay.text = _state.Points().ToString();
+            // Wait for the player to hit the "Play" button since it's the only
+            // interactive element in the scene.
+            await _playButton.OnClickAsync();
 
-            _playButton.onClick.AddListener(LoadGameplayScene);
-        }
-
-        private async void LoadGameplayScene()
-        {
-            var unloadTask = SceneManager.UnloadSceneAsync(_scene);
-            var loadTask = SceneManager.LoadSceneAsync("Gameplay", LoadSceneMode.Additive);
-            await UniTask.WhenAll(unloadTask.ToUniTask(), loadTask.ToUniTask());
-
-            // Initialize the scene controller.
-            FindObjectOfType<MatchController>().Init(_state, _socket);
+            return NextScreen.Match;
         }
     }
 }
