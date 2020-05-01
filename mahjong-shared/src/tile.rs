@@ -193,7 +193,7 @@ impl TileIdGenerator {
 // remove the `Clone` impl, since we could still use `new` to create a new instance
 // if we *really* needed to.
 #[cs_bindgen]
-#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TileInstance {
     pub id: TileId,
     pub tile: Tile,

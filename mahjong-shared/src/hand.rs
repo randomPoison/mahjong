@@ -1,4 +1,4 @@
-use crate::tile::TileInstance;
+use crate::tile::{TileId, TileInstance};
 use fehler::{throw, throws};
 use thiserror::Error;
 
@@ -21,9 +21,8 @@ pub struct Hand {
     tiles: Vec<TileInstance>,
     current_draw: Option<TileInstance>,
 
-    // "Inactive" tiles, i.e. ones that are still in the player's hand but can no longer
-    // be discarded because they were called from from another player or, in the case of
-    // closed kong, were opened voluntarily by the player.
+    // "Inactive" tiles, i.e. ones that are in open melds (or a closed kong) and cannot
+    // be discarded.
     open_chows: Vec<[TileInstance; 3]>,
     open_pongs: Vec<[TileInstance; 3]>,
     open_kongs: Vec<[TileInstance; 4]>,
@@ -52,13 +51,38 @@ impl Hand {
         }
     }
 
-    #[throws(AlreadyHasDraw)]
+    #[throws(DrawError)]
     pub fn draw_tile(&mut self, tile: TileInstance) {
         if self.current_draw.is_some() {
-            throw!(AlreadyHasDraw);
+            throw!(DrawError(tile));
         }
 
         self.current_draw = Some(tile);
+    }
+
+    #[throws(DiscardError)]
+    pub fn discard_tile(&mut self, id: TileId) {
+        let tile = self
+            .tiles
+            .iter()
+            .position(|tile| tile.id == id)
+            .map(|index| self.tiles.remove(index))
+            .or_else(|| {
+                // NOTE: The unwrap is valid here because a player will always have a current draw
+                // when discarding.
+                if self.current_draw.unwrap().id == id {
+                    self.current_draw.take()
+                } else {
+                    None
+                }
+            })
+            .ok_or(DiscardError)?;
+        self.discards.push(tile);
+
+        // If the player didn't discard their current draw, move the draw into their hand.
+        if let Some(draw) = self.current_draw.take() {
+            self.tiles.push(draw);
+        }
     }
 
     pub fn tiles(&self) -> &[TileInstance] {
@@ -90,10 +114,14 @@ impl Hand {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
 #[error("The wrong number of tiles were provided for a player's starting hand, expected 13 but received {}", _0)]
 pub struct WrongNumberOfTiles(usize);
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Error)]
 #[error("The player already has a drawn tile, and must discard before they can draw again")]
-pub struct AlreadyHasDraw;
+pub struct DrawError(TileInstance);
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Error)]
+#[error("Tile is not in the player's hand, or is in an open meld and so cannot be discarded")]
+pub struct DiscardError;
