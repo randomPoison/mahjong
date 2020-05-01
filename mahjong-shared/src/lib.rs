@@ -10,6 +10,7 @@ pub use strum;
 pub mod match_state;
 pub mod messages;
 pub mod tile;
+pub mod hand;
 
 cs_bindgen::export!();
 

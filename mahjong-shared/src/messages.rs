@@ -66,6 +66,7 @@ impl AccountId {
 #[repr(transparent)]
 pub struct SessionId(u32);
 
+// TODO: Rename this to `AccountState`.
 #[cs_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PlayerState {

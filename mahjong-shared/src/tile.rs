@@ -4,7 +4,7 @@ use serde::*;
 use strum::*;
 
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, From, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, Serialize, Deserialize)]
 pub enum Tile {
     Simple(SimpleTile),
     Wind(Wind),
@@ -29,7 +29,9 @@ impl Tile {
 }
 
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumIter, Serialize, Deserialize,
+)]
 pub enum Suit {
     Coins,
     Bamboo,
@@ -37,21 +39,23 @@ pub enum Suit {
 }
 
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SimpleTile {
     pub number: u8,
     pub suit: Suit,
 }
 
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, From, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, From, Serialize, Deserialize)]
 pub enum HonorTile {
     Wind(Wind),
     Dragon(Dragon),
 }
 
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumIter, Serialize, Deserialize,
+)]
 pub enum Wind {
     East,
     South,
@@ -101,7 +105,9 @@ impl Wind {
 }
 
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, EnumIter, Serialize, Deserialize,
+)]
 pub enum Dragon {
     White,
     Green,
@@ -187,7 +193,7 @@ impl TileIdGenerator {
 // remove the `Clone` impl, since we could still use `new` to create a new instance
 // if we *really* needed to.
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TileInstance {
     pub id: TileId,
     pub tile: Tile,
