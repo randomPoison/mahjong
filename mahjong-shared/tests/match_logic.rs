@@ -3,7 +3,6 @@
 
 use mahjong::{
     match_state::{MatchId, MatchState},
-    strum::IntoEnumIterator,
     tile::{self, Wind},
 };
 
@@ -13,30 +12,24 @@ use mahjong::{
 fn discard_from_hand() {
     let mut state = MatchState::new(MatchId::new(0), tile::generate_tileset());
 
-    // Deal each player their initial 13 tiles.
-    for seat in Wind::iter() {
-        state.draw_initial_tiles(seat, 13).unwrap();
-        assert_eq!(13, state.player(seat).hand.len());
-    }
-
     let mut current_player = Wind::East;
     while !state.wall.is_empty() {
         assert_eq!(current_player, state.current_turn);
 
         state.draw_for_player(current_player).unwrap();
         state
-            .discard_tile(current_player, state.player(current_player).hand[0].id)
+            .discard_tile(current_player, state.player(current_player).tiles()[0].id)
             .unwrap();
 
         // Verify that the player's hand is in the correct state after discarding.
         let player = state.player(current_player);
         assert_eq!(
             13,
-            player.hand.len(),
+            player.tiles().len(),
             "Player has wrong number of tiles in hand"
         );
         assert!(
-            player.current_draw.is_none(),
+            player.current_draw().is_none(),
             "Player still has a current draw after discarding"
         );
 

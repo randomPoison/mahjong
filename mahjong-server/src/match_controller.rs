@@ -1,6 +1,5 @@
 use crate::client::ClientControllerProxy;
-use anyhow::*;
-use mahjong::{match_state::*, messages::MatchEvent, strum::IntoEnumIterator, tile};
+use mahjong::{anyhow::*, match_state::*, messages::MatchEvent, tile};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
 use std::collections::HashMap;
@@ -26,11 +25,6 @@ impl MatchController {
         tiles.shuffle(&mut rng);
 
         let mut state = MatchState::new(id, tiles);
-
-        // Deal each player their initial 13 tiles.
-        for seat in Wind::iter() {
-            state.draw_initial_tiles(seat, 13).unwrap();
-        }
 
         // For the east player, have them draw the tile for their first turn.
         state.draw_for_player(Wind::East).unwrap();
@@ -102,7 +96,7 @@ impl MatchController {
             let draw = self.state.draw_for_player(player)?;
             self.broadcast(MatchEvent::TileDrawn {
                 seat: player,
-                tile: draw.id,
+                tile: draw,
             });
 
             if self.clients.contains_key(&player) {
@@ -111,7 +105,7 @@ impl MatchController {
             }
 
             // Automatically discard the first tile in the player's hand.
-            let auto_discard = self.state.player(player).hand[0].id;
+            let auto_discard = self.state.player(player).tiles()[0].id;
             info!(
                 seat = ?player,
                 discard = ?auto_discard,

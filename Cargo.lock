@@ -630,6 +630,7 @@ dependencies = [
 name = "mahjong"
 version = "0.1.0"
 dependencies = [
+ "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "cs-bindgen 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=4cd17c2)",
  "derive_more 0.99.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "fehler 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -648,7 +649,6 @@ dependencies = [
 name = "mahjong-server"
 version = "0.1.0"
 dependencies = [
- "anyhow 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "async-std 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive_more 0.99.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",

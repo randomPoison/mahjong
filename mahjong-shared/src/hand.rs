@@ -1,7 +1,9 @@
 use crate::tile::{TileId, TileInstance};
+use cs_bindgen::prelude::*;
 use fehler::{throw, throws};
-use thiserror::Error;
+use serde::{Deserialize, Serialize};
 use take_if::TakeIf;
+use thiserror::Error;
 
 /// Representation of a player's hand during a match.
 ///
@@ -16,7 +18,8 @@ use take_if::TakeIf;
 ///   have at least one open chow, pong, kong, or a closed kong.
 /// * The player will have 0 or 1 currently-drawn tile, and must discard a tile
 ///   before they may draw another.
-#[derive(Debug)]
+#[cs_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Hand {
     // "Active" tiles in the player's hand, i.e. ones that can still be discarded.
     tiles: Vec<TileInstance>,
@@ -34,15 +37,15 @@ pub struct Hand {
 }
 
 impl Hand {
-    #[throws(WrongNumberOfTiles)]
-    pub fn new<T: Into<Vec<TileInstance>>>(starting_tiles: T) {
-        let tiles = starting_tiles.into();
-        if tiles.len() != 13 {
-            throw!(WrongNumberOfTiles(tiles.len()));
-        }
+    pub fn new(draw_from: &mut Vec<TileInstance>) -> Self {
+        assert!(
+            draw_from.len() >= 13,
+            "Not enough tiles for initial hand, only {} left",
+            draw_from.len()
+        );
 
         Hand {
-            tiles,
+            tiles: draw_from.split_off(draw_from.len() - 13),
             current_draw: None,
             open_chows: Default::default(),
             open_pongs: Default::default(),

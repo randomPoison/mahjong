@@ -1,6 +1,6 @@
 //! Functionality for actually playing a mahjong match.
 
-use crate::{messages::*, tile::*};
+use crate::{hand::Hand, messages::*, tile::*};
 use cs_bindgen::prelude::*;
 use derive_more::Display;
 use fehler::{throw, throws};
@@ -17,7 +17,7 @@ pub struct MatchState {
     // TODO: Setup a better way of storing the players. Right now getting access to a
     // player always requires an `unwrap`, even though we know ahead of time that
     // there's a player for each wind.
-    pub players: HashMap<Wind, Player>,
+    pub players: HashMap<Wind, Hand>,
 
     /// The live wall that players will draw from.
     pub wall: Vec<TileInstance>,
@@ -27,14 +27,14 @@ pub struct MatchState {
 }
 
 impl MatchState {
-    pub fn new(id: MatchId, tiles: Vec<TileInstance>) -> Self {
+    pub fn new(id: MatchId, mut tiles: Vec<TileInstance>) -> Self {
         Self {
             id,
             players: hashmap! {
-                Wind::East => Player::new(),
-                Wind::South => Player::new(),
-                Wind::West => Player::new(),
-                Wind::North => Player::new(),
+                Wind::East => Hand::new(&mut tiles),
+                Wind::South => Hand::new(&mut tiles),
+                Wind::West => Hand::new(&mut tiles),
+                Wind::North => Hand::new(&mut tiles),
             },
 
             // TODO: Split the dead wall from the live wall and draw out an initial hand.
@@ -44,47 +44,26 @@ impl MatchState {
         }
     }
 
-    pub fn player(&self, seat: Wind) -> &Player {
+    pub fn player(&self, seat: Wind) -> &Hand {
         self.players.get(&seat).unwrap()
     }
 
-    /// Draws `count` tiles from the wall directly into a player's hand.
-    ///
-    /// This method should only be used when setting up the player's starting hand,
-    /// since it adds the drawn tile(s) directly to the player's hand without giving
-    /// them a chance to discard.
-    ///
-    /// If there are fewer than `count` tiles left in the wall, no tiles are drawn.
-    #[throws(InsufficientTiles)]
-    pub fn draw_initial_tiles(&mut self, seat: Wind, count: usize) {
-        let player = self.players.get_mut(&seat).unwrap();
-
-        // Check if there are enough tiles for the draw before actually drawing any, that
-        // way we don't have a partially-completed draw if there aren't enough tiles left.
-        if self.wall.len() < count {
-            throw!(InsufficientTiles::new(self.wall.len(), count));
-        }
-
-        for _ in 0..count {
-            player.hand.push(self.wall.pop().unwrap());
-        }
-    }
-
     /// Draws the next tile from the wall and puts it in a player's draw slot.
-    #[throws(InsufficientTiles)]
-    pub fn draw_for_player(&mut self, seat: Wind) -> TileInstance {
-        let player = self.players.get_mut(&seat).unwrap();
+    #[throws(anyhow::Error)]
+    pub fn draw_for_player(&mut self, seat: Wind) -> TileId {
+        let hand = self.players.get_mut(&seat).unwrap();
 
         let tile = self
             .wall
             .pop()
             .ok_or(InsufficientTiles::new(self.wall.len(), 1))?;
-        player.current_draw = Some(tile);
+        let id = tile.id;
+        hand.draw_tile(tile)?;
 
-        tile
+        id
     }
 
-    #[throws(InvalidDiscard)]
+    #[throws(anyhow::Error)]
     pub fn discard_tile(&mut self, seat: Wind, tile: TileId) {
         if seat != self.current_turn {
             throw!(InvalidDiscard::IncorrectTurn {
@@ -93,30 +72,8 @@ impl MatchState {
             });
         }
 
-        let player = self.players.get_mut(&seat).unwrap();
-        assert!(
-            player.current_draw.is_some(),
-            "Player didn't have a draw when discarding"
-        );
-
-        let tile = player
-            .remove_from_hand(tile)
-            .or_else(|| {
-                // NOTE: The unwrap is valid here because a player will always have a current draw
-                // when discarding.
-                if player.current_draw.unwrap().id == tile {
-                    player.current_draw.take()
-                } else {
-                    None
-                }
-            })
-            .ok_or(InvalidDiscard::TileNotInHand)?;
-        player.discards.push(tile);
-
-        // If the player didn't discard their current draw, move the draw into their hand.
-        if let Some(draw) = player.current_draw.take() {
-            player.hand.push(draw);
-        }
+        let hand = self.players.get_mut(&seat).unwrap();
+        hand.discard_tile(tile)?;
 
         // Update to the next player's turn, cycling through the seats in wind order.
         self.current_turn = self.current_turn.next();
@@ -138,18 +95,23 @@ impl MatchState {
 
     // TODO: Make the return type `&[Tile]` once cs-bindgen supports returning slices.
     pub fn player_hand(&self, seat: Wind) -> Vec<TileInstance> {
-        self.players.get(&seat).unwrap().hand.clone()
+        self.players.get(&seat).unwrap().tiles().into()
     }
 
     // TODO: Combine `player_has_current_draw` and `get_current_draw` into a single
     // function that returns an `Option<Tile>` once cs-bindgen supports `Option`.
 
     pub fn player_has_current_draw(&self, seat: Wind) -> bool {
-        self.players.get(&seat).unwrap().current_draw.is_some()
+        self.players.get(&seat).unwrap().current_draw().is_some()
     }
 
     pub fn current_draw(&self, seat: Wind) -> TileInstance {
-        self.players.get(&seat).unwrap().current_draw.unwrap()
+        self.players
+            .get(&seat)
+            .unwrap()
+            .current_draw()
+            .unwrap()
+            .clone()
     }
 
     // TODO: Remove this function once we can export `discard_tile` directly.
@@ -194,7 +156,7 @@ impl MatchState {
                 );
 
                 let draw = self.draw_for_player(seat).expect("Unable to draw locally");
-                assert_eq!(draw.id, tile, "Local draw does not match draw event");
+                assert_eq!(draw, tile, "Local draw does not match draw event");
             }
 
             MatchEvent::MatchEnded => {}
@@ -221,38 +183,6 @@ impl MatchId {
 
     pub fn raw(self) -> u32 {
         self.0
-    }
-}
-
-/// Player state within a match.
-#[cs_bindgen]
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Player {
-    /// The player's current hand.
-    // TODO: We probably want this to be a `HashMap<TileId, TileInstance>` instead of
-    // `Vec`. We should change that once we can export maps.
-    pub hand: Vec<TileInstance>,
-
-    /// The player's current draw, if any.
-    pub current_draw: Option<TileInstance>,
-
-    /// The player's discard pile.
-    // TODO: This should also probably be `HashMap<TileId, TileInstance>`.
-    pub discards: Vec<TileInstance>,
-}
-
-impl Player {
-    /// Creates a new player with all default (i.e. empty) values.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Removes the specified tile from the player's hand, if present.
-    pub fn remove_from_hand(&mut self, id: TileId) -> Option<TileInstance> {
-        self.hand
-            .iter()
-            .position(|tile| tile.id == id)
-            .map(|index| self.hand.remove(index))
     }
 }
 

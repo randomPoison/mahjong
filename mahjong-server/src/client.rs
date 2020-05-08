@@ -1,11 +1,10 @@
 use crate::{match_controller::*, GameState};
-use anyhow::*;
 use derive_more::Display;
 use futures::{
     prelude::*,
     stream::{SplitSink, SplitStream},
 };
-use mahjong::{messages::*, tile::Wind};
+use mahjong::{anyhow::*, messages::*, tile::Wind};
 use std::sync::atomic::{AtomicU64, Ordering};
 use thespian::{Actor, Remote, StageBuilder};
 use tracing::*;
