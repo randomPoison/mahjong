@@ -1,6 +1,7 @@
 use crate::tile::{TileId, TileInstance};
 use fehler::{throw, throws};
 use thiserror::Error;
+use take_if::TakeIf;
 
 /// Representation of a player's hand during a match.
 ///
@@ -62,21 +63,21 @@ impl Hand {
 
     #[throws(DiscardError)]
     pub fn discard_tile(&mut self, id: TileId) {
+        if self.current_draw.is_none() {
+            throw!(DiscardError::NoDraw);
+        }
+
+        // First attempt to remove the tile from the player's hand, otherwise attempt to
+        // discard the current draw. If the specified tile is neither in the player's
+        // hand nor is the current draw, return an error.
         let tile = self
             .tiles
             .iter()
             .position(|tile| tile.id == id)
             .map(|index| self.tiles.remove(index))
-            .or_else(|| {
-                // NOTE: The unwrap is valid here because a player will always have a current draw
-                // when discarding.
-                if self.current_draw.unwrap().id == id {
-                    self.current_draw.take()
-                } else {
-                    None
-                }
-            })
-            .ok_or(DiscardError)?;
+            .or_else(|| self.current_draw.take_if(|draw| draw.id == id))
+            .ok_or(DiscardError::NotInHand)?;
+
         self.discards.push(tile);
 
         // If the player didn't discard their current draw, move the draw into their hand.
@@ -122,6 +123,11 @@ pub struct WrongNumberOfTiles(usize);
 #[error("The player already has a drawn tile, and must discard before they can draw again")]
 pub struct DrawError(TileInstance);
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Error)]
-#[error("Tile is not in the player's hand, or is in an open meld and so cannot be discarded")]
-pub struct DiscardError;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Error)]
+pub enum DiscardError {
+    #[error("The player doesn't have a current draw")]
+    NoDraw,
+
+    #[error("Tile is not in the player's hand, or is in an open meld and so cannot be discarded")]
+    NotInHand,
+}
