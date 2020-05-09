@@ -192,9 +192,11 @@ impl TileIdGenerator {
 // should try to always "move" the tile as a logical object in order to reduce the
 // risk of bugs coming from accidentally duplicating tiles. We might even want to
 // remove the `Clone` impl, since we could still use `new` to create a new instance
-// if we *really* needed to.
+// if we *really* needed to. This will likely also require support for returning
+// values by reference, since we wouldn't be able to return a copy when passing
+// values to Rust.
 #[cs_bindgen]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TileInstance {
     pub id: TileId,
     pub tile: Tile,

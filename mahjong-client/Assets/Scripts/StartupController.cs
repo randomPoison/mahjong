@@ -100,7 +100,11 @@ namespace Synapse.Mahjong
             }
             catch (TaskCanceledException exception)
             {
-                Debug.LogFormat($"Main task was canceled: {exception}");
+                Debug.Log($"Main task was canceled: {exception}");
+            }
+            catch (OperationCanceledException exception)
+            {
+                Debug.Log($"Operation canceled during main task: {exception}");
             }
         }
 
