@@ -1,5 +1,6 @@
 use cs_bindgen::prelude::*;
 use derive_more::*;
+use num_traits::{ops::wrapping::WrappingAdd, One, PrimInt};
 use serde::*;
 use strum::*;
 
@@ -250,6 +251,269 @@ pub fn generate_tileset() -> Vec<TileInstance> {
     tiles
 }
 
-pub fn is_chow(first: Tile, second: Tile, third: Tile) -> bool {
-    todo!()
+/// Determines if the given tiles form a chow, i.e. a sequence in the same suit.
+///
+/// All three tiles must be simple tiles of the same suit (i.e. no dragons or
+/// winds), and their numeric values must form a numeric sequence. Returns `true` if
+/// any permutation of the tiles is a valid sequence.
+pub fn is_chow<T, U, V>(first: T, second: U, third: V) -> bool
+where
+    T: Into<Tile>,
+    U: Into<Tile>,
+    V: Into<Tile>,
+{
+    // Determine if all three tiles are simple tiles. Wind/Dragon tiles cannot form a
+    // chow, so if any of the tiles is not a simple then we return `false.`
+
+    let first = match first.into() {
+        Tile::Simple(tile) => tile,
+        _ => return false,
+    };
+
+    let second = match second.into() {
+        Tile::Simple(tile) => tile,
+        _ => return false,
+    };
+
+    let third = match third.into() {
+        Tile::Simple(tile) => tile,
+        _ => return false,
+    };
+
+    // Determine if all three tiles have the same suit.
+    if first.suit != second.suit || first.suit != third.suit {
+        return false;
+    }
+
+    // Check the six possible orderings for the tiles. If any of them forms a sequence
+    // then it is a valid chow.
+    let (first, second, third) = (first.number, second.number, third.number);
+    is_sequence(&[first, second, third])
+        || is_sequence(&[first, third, second])
+        || is_sequence(&[second, first, third])
+        || is_sequence(&[second, third, first])
+        || is_sequence(&[third, first, second])
+        || is_sequence(&[third, second, first])
+}
+
+/// Checks if a slice of integers is a consecutive sequence.
+///
+/// Returns `true` if all elements in `values` form a consecutive sequence in
+/// ascending order. Specifically, each element must be exactly one greater than the
+/// preceding element. This does not include wrapping, i.e. `[T::MAX, T::MIN]` is
+/// not considered a valid sequence.
+///
+/// Returns `true` if `values` is empty or only has one element.
+fn is_sequence<T>(values: &[T]) -> bool
+where
+    T: PrimInt + One + WrappingAdd,
+{
+    if values.is_empty() {
+        return true;
+    }
+
+    let mut last = values[0];
+    for &next in &values[1..] {
+        // Check for overflow when adding 1 to the last value. If the value overflowed while
+        // there are still more elements then `values` cannot be a valid sequence.
+        let expected_next = last.wrapping_add(&T::one());
+        if expected_next < last {
+            return false;
+        }
+
+        if next != expected_next {
+            return false;
+        }
+
+        last = next;
+    }
+
+    true
+}
+
+#[cfg(test)]
+mod is_chow_tests {
+    use super::*;
+    use itertools::Itertools;
+
+    // Tests for `is_chow`.
+
+    #[test]
+    fn rejects_honors() {
+        assert!(!is_chow(
+            Dragon::White,
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 1,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 2,
+            },
+        ));
+
+        assert!(!is_chow(
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 1,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 2,
+            },
+            Dragon::White,
+        ));
+
+        assert!(!is_chow(
+            Wind::East,
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 1,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 2,
+            },
+        ));
+
+        assert!(!is_chow(
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 1,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 2,
+            },
+            Wind::East,
+        ));
+    }
+
+    #[test]
+    fn rejects_mismatched_suits() {
+        assert!(!is_chow(
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 1,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 2,
+            },
+            SimpleTile {
+                suit: Suit::Bamboo,
+                number: 3,
+            },
+        ));
+
+        assert!(!is_chow(
+            SimpleTile {
+                suit: Suit::Bamboo,
+                number: 1,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 2,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 3,
+            },
+        ));
+
+        assert!(!is_chow(
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 1,
+            },
+            SimpleTile {
+                suit: Suit::Bamboo,
+                number: 2,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 3,
+            },
+        ));
+    }
+
+    #[test]
+    fn all_permutations() {
+        let tiles = [
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 1,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 2,
+            },
+            SimpleTile {
+                suit: Suit::Coins,
+                number: 3,
+            },
+        ];
+
+        for permutation in tiles.iter().permutations(3) {
+            assert!(is_chow(*permutation[0], *permutation[1], *permutation[2]));
+        }
+    }
+}
+
+#[cfg(tests)]
+mod is_sequence_tests {
+    use super::is_sequence;
+
+    #[test]
+    fn empty_sequence() {
+        assert!(is_sequence::<i32>(&[]));
+    }
+
+    #[test]
+    fn single_sequence() {
+        assert!(is_sequence(&[0]));
+        assert!(is_sequence(&[i32::MIN]));
+        assert!(is_sequence(&[i32::MAX]));
+    }
+
+    #[test]
+    fn detects_sequences() {
+        // Positive sequences.
+        assert!(is_sequence(&[0, 1, 2]));
+        assert!(is_sequence(&[0, 1, 2, 3, 4]));
+        assert!(is_sequence(&[u32::MIN, u32::MIN + 1, u32::MIN + 2]));
+
+        // Short sequences.
+        assert!(is_sequence(&[0, 1]));
+        assert!(is_sequence(&[1234, 1235]));
+
+        // Negative sequences.
+        assert!(is_sequence(&[-3, -2, -1, 0, 1, 2, 3]));
+        assert!(is_sequence(&[u32::MAX - 2, u32::MAX - 1, u32::MAX]));
+    }
+
+    #[test]
+    fn rejects_non_sequences() {
+        assert!(!is_sequence(&[1, 2, 0]));
+        assert!(!is_sequence(&[0, 1, 3, 4]));
+    }
+
+    #[test]
+    fn rejects_descending_sequence() {
+        assert!(!is_sequence(&[3, 2, 1]));
+        assert!(!is_sequence(&[-1, -2, -3]));
+    }
+
+    #[test]
+    fn wrapping_sequence() {
+        assert!(!is_sequence(&[u32::MAX, u32::MIN]));
+        assert!(!is_sequence(&[
+            u32::MAX - 2,
+            u32::MAX - 1,
+            u32::MAX,
+            u32::MIN,
+            u32::MIN + 1,
+            u32::MIN + 2,
+        ]));
+    }
 }
