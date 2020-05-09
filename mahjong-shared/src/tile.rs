@@ -249,3 +249,7 @@ pub fn generate_tileset() -> Vec<TileInstance> {
 
     tiles
 }
+
+pub fn is_chow(first: Tile, second: Tile, third: Tile) -> bool {
+    todo!()
+}

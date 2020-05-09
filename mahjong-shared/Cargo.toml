@@ -12,6 +12,7 @@ anyhow = "1.0.28"
 cs-bindgen = { git = "https://github.com/randomPoison/cs-bindgen", rev = "4cd17c2" }
 derive_more = "0.99.2"
 fehler = "1.0.0"
+itertools = "0.9.0"
 maplit = "1.0.2"
 rand = "0.7.3"
 semver = { version = "0.9.0", features = ["serde"] }
