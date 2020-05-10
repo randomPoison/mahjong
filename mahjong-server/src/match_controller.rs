@@ -21,7 +21,7 @@ impl MatchController {
         let mut rng = Pcg64Mcg::from_entropy();
 
         // Generate the tileset and shuffle it.
-        let mut tiles = tile::generate_tileset();
+        let mut tiles = tile::TILE_SET.clone();
         tiles.shuffle(&mut rng);
 
         let mut state = MatchState::new(id, tiles);

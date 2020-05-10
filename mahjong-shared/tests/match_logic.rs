@@ -10,7 +10,7 @@ use mahjong::{
 // hands (i.e. not discarding the tile they just drew).
 #[test]
 fn discard_from_hand() {
-    let mut state = MatchState::new(MatchId::new(0), tile::generate_tileset());
+    let mut state = MatchState::new(MatchId::new(0), tile::TILE_SET.clone());
 
     let mut current_player = Wind::East;
     while !state.wall.is_empty() {

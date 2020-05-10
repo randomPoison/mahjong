@@ -1,5 +1,6 @@
 use cs_bindgen::prelude::*;
 use derive_more::*;
+use lazy_static::lazy_static;
 use num_traits::{ops::wrapping::WrappingAdd, One, PrimInt};
 use serde::*;
 use strum::*;
@@ -44,6 +45,12 @@ pub enum Suit {
 pub struct SimpleTile {
     pub number: u8,
     pub suit: Suit,
+}
+
+impl SimpleTile {
+    pub const fn new(suit: Suit, number: u8) -> Self {
+        Self { suit, number }
+    }
 }
 
 #[cs_bindgen]
@@ -159,25 +166,15 @@ impl Dragon {
 /// [`TileInstance`], provides a way to unambiguously refer to a specific tile
 /// during a match.
 ///
-/// Tile IDs are generated once at the start of the match by the server and should
-/// not change for the duration of the match. Client code should avoid creating new
-/// `TileId` values.
+/// A given tile ID always maps to the same tile value, as specified by [`TILE_SET`].
+/// You can use [`by_id`] to lookup the [`Tile`] value for a `TileId`.
 ///
 /// [`TileInstance`]: struct.TileInstance.html
+/// [`Tile`]: struct.Tile.html
+/// [`by_id`]: fn.by_id.html
 #[cs_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct TileId(u8);
-
-#[derive(Debug, Clone, Default)]
-struct TileIdGenerator(u8);
-
-impl TileIdGenerator {
-    fn next(&mut self) -> TileId {
-        let id = TileId(self.0);
-        self.0 += 1;
-        id
-    }
-}
 
 /// An instance of a tile within a player's hand during a match.
 ///
@@ -211,46 +208,75 @@ impl TileInstance {
     }
 }
 
-/// Generates a complete set of Mahjong tiles, including bonus tiles.
-///
-/// The tiles are not shuffled, and will always be in the same initial order.
-pub fn generate_tileset() -> Vec<TileInstance> {
-    let mut tiles = Vec::with_capacity(144);
-    let mut id_generator = TileIdGenerator::default();
+lazy_static! {
+    /// The full set of tile instances for a Riichi Mahjong match.
+    pub static ref TILE_SET: Vec<TileInstance> =  {
+        /// Helper struct for generating the tile IDs.
+        #[derive(Default)]
+        struct TileIdGenerator(u8);
 
-    // Add simple tiles for each suit:
-    //
-    // * Tiles in each suit are numbered 1-9.
-    // * There are four copies of each simple tile.
-    for suit in Suit::iter() {
-        for number in 1..=9 {
-            for _ in 0..4 {
-                tiles.push(TileInstance::new(
-                    SimpleTile { suit, number },
-                    id_generator.next(),
-                ));
+        impl TileIdGenerator {
+            fn next(&mut self) -> TileId {
+                let id = TileId(self.0);
+                self.0 += 1;
+                id
             }
         }
-    }
 
-    // Add honor tiles:
-    //
-    // * There are dragon and wind honors.
-    // * There are four copies of each honor tile.
+        let mut tiles = Vec::with_capacity(144);
+        let mut id_generator = TileIdGenerator::default();
 
-    for dragon in Dragon::iter() {
-        for _ in 0..4 {
-            tiles.push(TileInstance::new(dragon, id_generator.next()));
+        // Add simple tiles for each suit:
+        //
+        // * Tiles in each suit are numbered 1-9.
+        // * There are four copies of each simple tile.
+        for suit in Suit::iter() {
+            for number in 1..=9 {
+                for _ in 0..4 {
+                    tiles.push(TileInstance::new(
+                        SimpleTile { suit, number },
+                        id_generator.next(),
+                    ));
+                }
+            }
         }
-    }
 
-    for wind in Wind::iter() {
-        for _ in 0..4 {
-            tiles.push(TileInstance::new(wind, id_generator.next()));
+        // Add honor tiles:
+        //
+        // * There are dragon and wind honors.
+        // * There are four copies of each honor tile.
+
+        for dragon in Dragon::iter() {
+            for _ in 0..4 {
+                tiles.push(TileInstance::new(dragon, id_generator.next()));
+            }
         }
-    }
 
-    tiles
+        for wind in Wind::iter() {
+            for _ in 0..4 {
+                tiles.push(TileInstance::new(wind, id_generator.next()));
+            }
+        }
+
+        tiles
+    };
+}
+
+/// Returns the tile value associated with the specified ID.
+///
+/// Since each [`TileId`] has a unique mapping to a [`Tile`] value, we can lookup
+/// the tile associated with a given ID. This allows us to pass around [`TileId`]
+/// values while still being able to reason about the tile they refer to when
+/// necessary.
+///
+/// [`TileId`]: struct.TileId.html
+/// [`Tile`]: struct.Tile.html
+pub fn by_id(id: TileId) -> Tile {
+    TILE_SET
+        .iter()
+        .find(|instance| instance.id == id)
+        .map(|instance| instance.tile)
+        .unwrap_or_else(|| panic!("Unknown tile ID: {:?}", id))
 }
 
 /// Determines if the given tiles form a chow, i.e. a sequence in the same suit.
