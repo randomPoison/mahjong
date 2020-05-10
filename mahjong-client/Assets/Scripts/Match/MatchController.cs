@@ -37,6 +37,10 @@ namespace Synapse.Mahjong.Match
         [SerializeField] private GameObject _matchEndedDisplayRoot = default;
         [SerializeField] private Button _exitButton = default;
 
+        [Header("Action Timing")]
+        [SerializeField] private float _delayAfterDraw = 1f;
+        [SerializeField] private float _delayAfterDiscard = 1f;
+
         #endregion
 
         #region Private Fields
@@ -155,6 +159,8 @@ namespace Synapse.Mahjong.Match
                         var tileObject = InstantiateTile(localDraw);
                         hand.DrawTile(tileObject);
 
+                        // TODO: Do some kind of actual animation for the draw.
+
                         // If the local player was the one that drew the tile, have them discard a
                         // tile now.
                         if (draw.Seat == _seat)
@@ -164,6 +170,12 @@ namespace Synapse.Mahjong.Match
                                 "Player drew a tile but it's not their turn???");
 
                             await DiscardTile();
+                        }
+                        else
+                        {
+                            // TODO: Remove the explicit delay once we have an animation for the
+                            // draw.
+                            await UniTask.Delay((int)(_delayAfterDraw * 1000));
                         }
                     }
                     break;
@@ -195,6 +207,9 @@ namespace Synapse.Mahjong.Match
                             // Perform the discard action locally.
                             var hand = _hands[(int)discard.Seat];
                             hand.MoveToDiscard(discard.Tile);
+
+                            // TODO: Remove the explicit delay once we have a proper animation.
+                            await UniTask.Delay((int)(_delayAfterDiscard * 1000));
                         }
                         else
                         {
