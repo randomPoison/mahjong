@@ -110,6 +110,26 @@ impl Wind {
             Wind::North => Wind::East,
         }
     }
+
+    /// Determines the turn distance to `other`.
+    ///
+    /// Distance is determined by turn order, e.g. the distance from `East` to `South`
+    /// is 1, and from `East` to `North` is 3.
+    ///
+    /// ```
+    /// use mahjong::tile::Wind::*;
+    ///
+    /// assert_eq!(East.distance_to(North), 3);
+    /// assert_eq!(North.distance_to(East), 1);
+    /// ```
+    pub fn distance_to(mut self, other: Self) -> u8 {
+        let mut count = 0;
+        while self != other {
+            self = self.next();
+            count += 1;
+        }
+        count
+    }
 }
 
 #[cs_bindgen]

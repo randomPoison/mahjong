@@ -33,6 +33,20 @@ fn discard_from_hand() {
             "Player still has a current draw after discarding"
         );
 
+        // If any players can call the discarded tile, have them pass. We specifically
+        // DON'T want any of them to actually make a call because that would potentially
+        // change the turn order which isn't something we care about testing here.
+        if let TurnState::AwaitingCalls { waiting, .. } = &state.turn_state {
+            // NOTE: Clone `waiting` so that we aren't still borrowing `state` when we do
+            // `state.call_tile()`.
+            let waiting = waiting.clone();
+            for &seat in waiting.keys() {
+                state.call_tile(seat, None).unwrap();
+            }
+
+            state.decide_call().unwrap();
+        }
+
         current_player = current_player.next();
     }
 }

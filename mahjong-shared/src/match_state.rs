@@ -1,9 +1,9 @@
 //! Functionality for actually playing a mahjong match.
 
 use crate::{
-    hand::{Call, Hand},
+    hand::{self, Call, Hand},
     messages::*,
-    tile::*,
+    tile::{self, TileId, TileInstance, Wind},
 };
 use anyhow::bail;
 use cs_bindgen::prelude::*;
@@ -56,6 +56,15 @@ impl MatchState {
     /// Draws the next tile from the wall and puts it in a player's draw slot.
     #[throws(anyhow::Error)]
     pub fn draw_for_player(&mut self, seat: Wind) -> TileId {
+        // Verify that the draw action is valid.
+        if self.turn_state != TurnState::AwaitingDraw(seat) {
+            bail!(
+                "Attempting to draw tile for {:?} when turn state is {:?}",
+                seat,
+                self.turn_state,
+            );
+        }
+
         let hand = self.players.get_mut(&seat).unwrap();
 
         let tile = self
@@ -65,14 +74,18 @@ impl MatchState {
         let id = tile.id;
         hand.draw_tile(tile)?;
 
+        // Update the turn state to wait for the player that just drew to discard.
+        self.turn_state = TurnState::AwaitingDiscard(seat);
+
         id
     }
 
     #[throws(anyhow::Error)]
     pub fn discard_tile(&mut self, seat: Wind, tile: TileId) {
+        // Verify that the discard action is valid.
         if self.turn_state != TurnState::AwaitingDiscard(seat) {
             bail!(
-                "Invalid action, attempting to discard tile for {:?} when current turn is {:?}",
+                "Attempting to discard tile for {:?} when current turn is {:?}",
                 seat,
                 self.turn_state,
             );
@@ -81,8 +94,127 @@ impl MatchState {
         let hand = self.players.get_mut(&seat).unwrap();
         hand.discard_tile(tile)?;
 
-        // Update to the next player's turn, cycling through the seats in wind order.
-        self.turn_state = TurnState::AwaitingDraw(seat.next());
+        // Determine if any players are able to call the tile.
+        let mut waiting = HashMap::new();
+        for (&calling_seat, hand) in self.players.iter().filter(|(&player, _)| player != seat) {
+            let calls = hand.find_possible_calls(tile::by_id(tile), seat.next() == calling_seat);
+            if !calls.is_empty() {
+                waiting.insert(calling_seat, calls);
+            }
+        }
+
+        // Update the turn state based on whether or not any players can call the discarded
+        // tile. If any players can call, we wait for all players to either call or pass.
+        // Otherwise, we wait for the next player's draw.
+        if !waiting.is_empty() {
+            self.turn_state = TurnState::AwaitingCalls {
+                discarding_player: seat,
+                discard: tile,
+                calls: HashMap::new(),
+                waiting,
+            }
+        } else {
+            self.turn_state = TurnState::AwaitingDraw(seat.next());
+        }
+    }
+
+    #[throws(anyhow::Error)]
+    pub fn call_tile(&mut self, seat: Wind, call: Option<Call>) {
+        let (calls, waiting) = match &mut self.turn_state {
+            TurnState::AwaitingCalls { calls, waiting, .. } => (calls, waiting),
+
+            _ => bail!(
+                "Attempting to call tile for {:?} when turn state is {:?}",
+                seat,
+                self.turn_state,
+            ),
+        };
+
+        let possible_calls = match waiting.get(&seat) {
+            Some(possible_calls) => possible_calls,
+            None => bail!(
+                "Attempting to call for {:?} but that player cannot call currently",
+                seat,
+            ),
+        };
+
+        match call {
+            // Verify that the provided call is valid, and if it is remove the player `waiting`
+            // and add their call to `calls`.
+            Some(call) => {
+                if possible_calls.contains(&call) {
+                    waiting.remove(&seat);
+                    assert!(
+                        calls.insert(seat, call).is_none(),
+                        "Found previous call for {:?}",
+                        seat,
+                    );
+                } else {
+                    bail!(
+                        "Attempting to make call {:?} for player {:?} that is not in list of valid \
+                        calls: {:?}",
+                        call,
+                        seat,
+                        possible_calls,
+                    );
+                }
+            }
+
+            // Player is passing, so remove them from the waiting list without adding a call for
+            // them.
+            None => {
+                waiting.remove(&seat);
+            }
+        }
+
+        // NOTE: No state transition here. Once there are no more waiting players, the match
+        // runner calls `decide_call` to apply the outcome of the call phase.
+    }
+
+    #[throws(anyhow::Error)]
+    pub fn decide_call(&mut self) -> Option<(Wind, TileId)> {
+        let (calls, waiting, discard, &mut discarding_player) = match &mut self.turn_state {
+            TurnState::AwaitingCalls {
+                calls,
+                waiting,
+                discard,
+                discarding_player,
+            } => (calls, waiting, discard, discarding_player),
+
+            _ => bail!(
+                "Attempting to decide call when turn state is {:?}",
+                self.turn_state,
+            ),
+        };
+
+        if !waiting.is_empty() {
+            bail!(
+                "Attempting to decide call when players still need to call: {:?}",
+                waiting,
+            );
+        }
+
+        if calls.is_empty() {}
+
+        let max = calls
+            .iter()
+            .max_by(|(&left_seat, &left_call), (&right_seat, &right_call)| {
+                hand::compare_calls(
+                    left_seat,
+                    left_call,
+                    right_seat,
+                    right_call,
+                    discarding_player,
+                )
+            });
+
+        if let Some((&seat, &call)) = max {
+            todo!("Actually apply the winning call to the player's shit");
+        } else {
+            // If all players passed, move to the next player's draw phase and return `None`.
+            self.turn_state = TurnState::AwaitingDraw(discarding_player.next());
+            None
+        }
     }
 }
 
@@ -228,12 +360,16 @@ pub enum TurnState {
     AwaitingDiscard(Wind),
 
     AwaitingCalls {
+        discarding_player: Wind,
         discard: TileId,
 
         /// Calls made so far by players who can call the discarded tile.
         calls: HashMap<Wind, Call>,
 
         /// Remaining player that need to either call or pass.
-        waiting: Vec<Wind>,
+        ///
+        /// Key is the seat of the player that can call, value is the list of valid calls
+        /// for the player.
+        waiting: HashMap<Wind, Vec<Call>>,
     },
 }

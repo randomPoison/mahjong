@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, collections::HashSet};
 use take_if::TakeIf;
 use thiserror::Error;
+use tile::Wind;
 
 /// Representation of a player's hand during a match.
 ///
@@ -216,7 +217,7 @@ impl Hand {
 /// that kan has higher priority than pon, and pon has higher priority than chii.
 /// All chii calls have the same priority regardless of the sequence being made.
 #[cs_bindgen]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Call {
     /// A "chii" call, making a chow meld (i.e. three tiles in a sequence).
     ///
@@ -236,27 +237,58 @@ pub enum Call {
     /// draws instead of discards. No tiles from the hand are specified, since there
     /// is only ever at most one way to make a kong.
     Kan,
+
+    /// A call for a player's winning tile. Can be a "chii", a "pon", or one of the
+    Ron,
 }
 
-impl PartialOrd for Call {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Call {
-    fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (Call::Kan, Call::Kan) => Ordering::Equal,
-            (Call::Kan, _) => Ordering::Greater,
-
-            (Call::Pon, Call::Kan) => Ordering::Less,
-            (Call::Pon, Call::Pon) => Ordering::Equal,
-            (Call::Pon, Call::Chii(..)) => Ordering::Greater,
-
-            (Call::Chii(..), Call::Chii(..)) => Ordering::Equal,
-            (Call::Chii(..), _) => Ordering::Less,
+/// Compares two calls given the full context for the call.
+///
+/// In order to full determine precedence between two calls in all cases, we need
+/// the seat for both callers and the seat of the discarding player (in order to
+/// evaluate the head bump rule if two or more players call "ron" on the same
+/// discard).
+///
+/// # Panics
+///
+/// This function panics if the pair of calls would not be valid during a match.
+/// Specifically:
+///
+/// * If both calls are "kan", since there can only be one four-of-a-kind formed
+///   from a given discard.
+/// * If both calls are "pon", since there can only be one three-of-a-kind formed
+///   from a given discard.
+/// * If both calls are "chii", since only one player may call "chii" for a given
+///   discard.
+pub fn compare_calls(
+    left_seat: Wind,
+    left_call: Call,
+    right_seat: Wind,
+    right_call: Call,
+    discarding_seat: Wind,
+) -> Ordering {
+    match (left_call, right_call) {
+        // If both players called "ron", the head bump rule says that the winner is the
+        // player closest in turn order to the discarding player.
+        (Call::Ron, Call::Ron) => {
+            let left_distance = discarding_seat.distance_to(left_seat);
+            let right_distance = discarding_seat.distance_to(right_seat);
+            right_distance.cmp(&left_distance)
         }
+
+        (Call::Ron, _) => Ordering::Greater,
+
+        (Call::Kan, Call::Ron) => Ordering::Less,
+        (Call::Kan, Call::Kan) => panic!(r#"More than one "kan" call for discard"#),
+        (Call::Kan, _) => Ordering::Greater,
+
+        (Call::Pon, Call::Ron) => Ordering::Less,
+        (Call::Pon, Call::Kan) => Ordering::Less,
+        (Call::Pon, Call::Pon) => panic!(r#"More than one "pon" call for discard"#),
+        (Call::Pon, Call::Chii(..)) => Ordering::Greater,
+
+        (Call::Chii(..), Call::Chii(..)) => panic!(r#"More than one "chii" call for discard"#),
+        (Call::Chii(..), _) => Ordering::Less,
     }
 }
 
@@ -289,5 +321,59 @@ impl PartialEq for TilePair<'_> {
     fn eq(&self, other: &Self) -> bool {
         (self.0.tile == other.0.tile && self.1.tile == other.1.tile)
             || (self.0.tile == other.1.tile && self.1.tile == other.0.tile)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{compare_calls, Call::*};
+    use crate::tile::Wind::*;
+    use crate::tile::TILE_SET;
+    use std::cmp::Ordering;
+
+    #[test]
+    fn call_precedence() {
+        // Grab the ID of the first tile in `TILE_SET` to use as a dummy ID when checking
+        // chii calls. The tiles selected in the call shouldn't impact ordering, so it
+        // doesn't matter that it's not technically valid to have two of the same ID in the
+        // call.
+        let id = TILE_SET[0].id;
+
+        // "Ron" has highest precedence.
+        assert_eq!(
+            compare_calls(East, Ron, West, Kan, South),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_calls(East, Ron, West, Pon, South),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_calls(East, Ron, West, Chii(id, id), South),
+            Ordering::Greater
+        );
+
+        // If both calls are "ron", the closest to the discarding player has precedence.
+        assert_eq!(
+            compare_calls(East, Ron, West, Ron, North),
+            Ordering::Greater
+        );
+        assert_eq!(compare_calls(East, Ron, West, Ron, South), Ordering::Less);
+
+        // "Kan" has next highest.
+        assert_eq!(
+            compare_calls(East, Kan, West, Pon, South),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_calls(East, Kan, West, Chii(id, id), South),
+            Ordering::Greater
+        );
+
+        // "Pon" only has precedence over "chii".
+        assert_eq!(
+            compare_calls(East, Pon, West, Chii(id, id), South),
+            Ordering::Greater
+        );
     }
 }
