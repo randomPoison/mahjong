@@ -1,5 +1,7 @@
 use crate::client::ClientControllerProxy;
-use mahjong::{anyhow::*, match_state::*, messages::MatchEvent, tile};
+use mahjong::{
+    anyhow::*, hand::Call, match_state::*, messages::MatchEvent, strum::IntoEnumIterator, tile,
+};
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
 use std::collections::HashMap;
@@ -69,7 +71,7 @@ impl MatchController {
 
     /// Returns the updated match state if the requested discard is valid.
     #[tracing::instrument(skip(self))]
-    pub async fn discard_tile(&mut self, player: Wind, tile: TileId) -> Result<()> {
+    pub fn discard_tile(&mut self, player: Wind, tile: TileId) -> Result<()> {
         trace!("Attempting to discard tile");
 
         // TODO: Provide more robust state transitions such that it's not possible to get
@@ -117,6 +119,20 @@ impl MatchController {
                 seat: player,
                 tile: auto_discard,
             });
+
+            // Check to see if any players can call the discard. If the player is computer
+            // controlled, call it automatically, otherwise wait for a player to decide if
+            // they're going to call.
+            let discard_tile = tile::by_id(auto_discard);
+            let mut winning_call = None;
+            for seat in Wind::iter() {
+                let calls = self
+                    .state
+                    .player(seat)
+                    .find_possible_calls(discard_tile, seat == player.next());
+
+                if self.clients.contains_key(&seat) {}
+            }
         }
 
         // If the match is over, broadcast an event notifying all clients of the outcome.
@@ -125,5 +141,10 @@ impl MatchController {
         }
 
         Ok(())
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub fn call_tile(&mut self, player: Wind, call: Option<Call>) -> Result<()> {
+        todo!()
     }
 }

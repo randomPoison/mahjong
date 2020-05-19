@@ -1,9 +1,9 @@
-use crate::tile::{self, TileId, TileInstance};
+use crate::tile::{self, Tile, TileId, TileInstance};
 use cs_bindgen::prelude::*;
 use fehler::{throw, throws};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::{cmp::Ordering, collections::HashSet};
 use take_if::TakeIf;
 use thiserror::Error;
 
@@ -126,7 +126,7 @@ impl Hand {
     /// `true`, then multiple `Chii` calls may be returned. If there are multiple ways
     /// to form the same `Chii` call, only one instance is returned, i.e. there's no
     /// need to "de-duplicate" the returned calls.
-    pub fn find_possible_calls(&self, discard: &TileInstance, can_call_chii: bool) -> Vec<Call> {
+    pub fn find_possible_calls(&self, discard: Tile, can_call_chii: bool) -> Vec<Call> {
         let mut calls = Vec::new();
 
         if can_call_chii {
@@ -137,7 +137,7 @@ impl Hand {
             // Iterate over all combinations of 2 tiles from the hand and check to see if those
             // tiles can form chow with the discarded tile.
             for (first, second) in self.tiles.iter().tuple_combinations() {
-                if tile::is_chow(discard.tile, first.tile, second.tile) {
+                if tile::is_chow(discard, first.tile, second.tile) {
                     chii_calls.insert(TilePair(first, second));
                 }
             }
@@ -155,7 +155,7 @@ impl Hand {
         let matching_tiles_in_hand = self
             .tiles
             .iter()
-            .filter(|tile| tile.tile == discard.tile)
+            .filter(|instance| instance.tile == discard)
             .count();
 
         assert!(
@@ -209,8 +209,14 @@ impl Hand {
 }
 
 /// A possible call when another player discards a tile.
+///
+/// # Ordering
+///
+/// Calls are ordered by precedence value when multiple players make a call, such
+/// that kan has higher priority than pon, and pon has higher priority than chii.
+/// All chii calls have the same priority regardless of the sequence being made.
 #[cs_bindgen]
-#[derive(Debug, Clone, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Call {
     /// A "chii" call, making a chow meld (i.e. three tiles in a sequence).
     ///
@@ -232,18 +238,24 @@ pub enum Call {
     Kan,
 }
 
-impl PartialEq for Call {
-    fn eq(&self, other: &Self) -> bool {
+impl PartialOrd for Call {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Call {
+    fn cmp(&self, other: &Self) -> Ordering {
         match (self, other) {
-            (Call::Pon, Call::Pon) => true,
-            (Call::Kan, Call::Kan) => true,
+            (Call::Kan, Call::Kan) => Ordering::Equal,
+            (Call::Kan, _) => Ordering::Greater,
 
-            // Equality for chii calls is independent of the order of the tiles specified.
-            (Call::Chii(self_0, self_1), Call::Chii(other_0, other_1)) => {
-                (self_0 == other_1 && self_1 == other_1) || (self_0 == other_1 && self_1 == other_0)
-            }
+            (Call::Pon, Call::Kan) => Ordering::Less,
+            (Call::Pon, Call::Pon) => Ordering::Equal,
+            (Call::Pon, Call::Chii(..)) => Ordering::Greater,
 
-            _ => false,
+            (Call::Chii(..), Call::Chii(..)) => Ordering::Equal,
+            (Call::Chii(..), _) => Ordering::Less,
         }
     }
 }

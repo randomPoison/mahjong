@@ -2,7 +2,7 @@
 //! state as actions are performed in the game.
 
 use mahjong::{
-    match_state::{MatchId, MatchState},
+    match_state::{MatchId, MatchState, TurnState},
     tile::{self, Wind},
 };
 
@@ -14,7 +14,7 @@ fn discard_from_hand() {
 
     let mut current_player = Wind::East;
     while !state.wall.is_empty() {
-        assert_eq!(current_player, state.current_turn);
+        assert_eq!(TurnState::AwaitingDraw(current_player), state.turn_state);
 
         state.draw_for_player(current_player).unwrap();
         state

@@ -1,9 +1,14 @@
 //! Functionality for actually playing a mahjong match.
 
-use crate::{hand::Hand, messages::*, tile::*};
+use crate::{
+    hand::{Call, Hand},
+    messages::*,
+    tile::*,
+};
+use anyhow::bail;
 use cs_bindgen::prelude::*;
 use derive_more::Display;
-use fehler::{throw, throws};
+use fehler::throws;
 use maplit::hashmap;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug};
@@ -23,7 +28,7 @@ pub struct MatchState {
     pub wall: Vec<TileInstance>,
 
     /// The seat wind of the player who is currently taking their turn.
-    pub current_turn: Wind,
+    pub turn_state: TurnState,
 }
 
 impl MatchState {
@@ -40,7 +45,7 @@ impl MatchState {
             // TODO: Split the dead wall from the live wall and draw out an initial hand.
             wall: tiles,
 
-            current_turn: Wind::East,
+            turn_state: TurnState::AwaitingDraw(Wind::East),
         }
     }
 
@@ -65,18 +70,19 @@ impl MatchState {
 
     #[throws(anyhow::Error)]
     pub fn discard_tile(&mut self, seat: Wind, tile: TileId) {
-        if seat != self.current_turn {
-            throw!(InvalidDiscard::IncorrectTurn {
-                expected: seat,
-                actual: self.current_turn,
-            });
+        if self.turn_state != TurnState::AwaitingDiscard(seat) {
+            bail!(
+                "Invalid action, attempting to discard tile for {:?} when current turn is {:?}",
+                seat,
+                self.turn_state,
+            );
         }
 
         let hand = self.players.get_mut(&seat).unwrap();
         hand.discard_tile(tile)?;
 
         // Update to the next player's turn, cycling through the seats in wind order.
-        self.current_turn = self.current_turn.next();
+        self.turn_state = TurnState::AwaitingDraw(seat.next());
     }
 }
 
@@ -87,10 +93,6 @@ impl MatchState {
 
     pub fn id(&self) -> MatchId {
         self.id
-    }
-
-    pub fn current_turn(&self) -> Wind {
-        self.current_turn
     }
 
     // TODO: Make the return type `&[Tile]` once cs-bindgen supports returning slices.
@@ -134,6 +136,7 @@ impl MatchState {
         serde_json::to_string(&request).unwrap()
     }
 
+    // TODO: Return a `Result` here
     pub fn handle_event(&mut self, json: String) -> MatchEvent {
         let event = serde_json::from_str(&json).unwrap();
 
@@ -141,8 +144,9 @@ impl MatchState {
         match &event {
             &MatchEvent::TileDiscarded { seat, tile } => {
                 assert_eq!(
-                    self.current_turn, seat,
-                    "Draw event does not match current turn"
+                    self.turn_state,
+                    TurnState::AwaitingDiscard(seat),
+                    "Draw event does not match current turn",
                 );
 
                 self.discard_tile(seat, tile)
@@ -151,8 +155,9 @@ impl MatchState {
 
             &MatchEvent::TileDrawn { seat, tile } => {
                 assert_eq!(
-                    self.current_turn, seat,
-                    "Draw event does not match current turn"
+                    self.turn_state,
+                    TurnState::AwaitingDraw(seat),
+                    "Draw event does not match current turn",
                 );
 
                 let draw = self.draw_for_player(seat).expect("Unable to draw locally");
@@ -213,5 +218,22 @@ pub enum InvalidDiscard {
 
         /// The player who's turn was active.
         actual: Wind,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TurnState {
+    AwaitingDraw(Wind),
+
+    AwaitingDiscard(Wind),
+
+    AwaitingCalls {
+        discard: TileId,
+
+        /// Calls made so far by players who can call the discarded tile.
+        calls: HashMap<Wind, Call>,
+
+        /// Remaining player that need to either call or pass.
+        waiting: Vec<Wind>,
     },
 }
