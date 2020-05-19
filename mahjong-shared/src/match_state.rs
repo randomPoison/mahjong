@@ -173,7 +173,7 @@ impl MatchState {
 
     #[throws(anyhow::Error)]
     pub fn decide_call(&mut self) -> Option<(Wind, TileId)> {
-        let (calls, waiting, discard, &mut discarding_player) = match &mut self.turn_state {
+        let (calls, waiting, &discard_id, &mut discarding_player) = match &mut self.turn_state {
             TurnState::AwaitingCalls {
                 calls,
                 waiting,
@@ -209,7 +209,25 @@ impl MatchState {
             });
 
         if let Some((&seat, &call)) = max {
-            todo!("Actually apply the winning call to the player's shit");
+            // Remove the called tile from the discarding player's discards.
+            let discarding_hand = self.players.get_mut(&discarding_player).unwrap();
+            let discard = discarding_hand
+                .call_last_discard()
+                .expect("Discarding player has no discarded tiles");
+            assert_eq!(
+                discard.id, discard_id,
+                "Last discarded tile does not match saved ID",
+            );
+
+            // Add the tile to the calling player's hand, making the appropriate meld.
+            let calling_hand = self.players.get_mut(&seat).unwrap();
+            calling_hand.call_tile(discard, call);
+
+            // Set the turn order to the next player after the calling player.
+            self.turn_state = TurnState::AwaitingDraw(seat.next());
+
+            // Return the winning call, I guess?
+            Some((seat, call))
         } else {
             // If all players passed, move to the next player's draw phase and return `None`.
             self.turn_state = TurnState::AwaitingDraw(discarding_player.next());

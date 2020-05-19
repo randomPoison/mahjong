@@ -180,6 +180,15 @@ impl Hand {
         calls
     }
 
+    pub fn call_tile(&mut self, discard: TileInstance, call: Call) {
+        todo!();
+    }
+
+    /// Calls the last discarded tile from the player's discards.
+    pub fn call_last_discard(&mut self) -> Option<TileInstance> {
+        self.discards.pop()
+    }
+
     pub fn tiles(&self) -> &[TileInstance] {
         &self.tiles
     }
