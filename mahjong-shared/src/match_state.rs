@@ -172,8 +172,8 @@ impl MatchState {
     }
 
     #[throws(anyhow::Error)]
-    pub fn decide_call(&mut self) -> Option<(Wind, TileId)> {
-        let (calls, waiting, &discard_id, &mut discarding_player) = match &mut self.turn_state {
+    pub fn decide_call(&mut self) -> Option<(Wind, Call)> {
+        let (calls, waiting, &mut discard_id, &mut discarding_player) = match &mut self.turn_state {
             TurnState::AwaitingCalls {
                 calls,
                 waiting,
