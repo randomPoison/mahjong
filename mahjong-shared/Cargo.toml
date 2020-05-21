@@ -24,3 +24,4 @@ strum = { version = "0.17.1", features = ["derive"] }
 take-if = "1.0.0"
 thiserror = "1.0.15"
 tracing = "0.1.13"
+vec-drain-where = "1.0.1"

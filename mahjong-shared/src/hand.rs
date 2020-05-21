@@ -1,4 +1,5 @@
 use crate::tile::{self, Tile, TileId, TileInstance};
+use anyhow::{anyhow, bail};
 use cs_bindgen::prelude::*;
 use fehler::{throw, throws};
 use itertools::Itertools;
@@ -7,6 +8,7 @@ use std::{cmp::Ordering, collections::HashSet};
 use take_if::TakeIf;
 use thiserror::Error;
 use tile::Wind;
+use vec_drain_where::VecDrainWhereExt;
 
 /// Representation of a player's hand during a match.
 ///
@@ -33,6 +35,9 @@ pub struct Hand {
 
     // "Inactive" tiles, i.e. ones that are in open melds (or a closed kong) and cannot
     // be discarded.
+    //
+    // TODO: For each open meld, track which tile was called and which player it was
+    // called from. This is necessary for visualizing open melds correctly.
     open_chows: Vec<[TileInstance; 3]>,
     open_pongs: Vec<[TileInstance; 3]>,
     open_kongs: Vec<[TileInstance; 4]>,
@@ -180,8 +185,122 @@ impl Hand {
         calls
     }
 
+    /// Apply the selected call to the hand.
+    ///
+    /// # Errors
+    ///
+    /// Validates that the specified call is actually valid. No state is modified is
+    /// modified in the case that the call is invalid.
+    // TODO: The error handling here isn't quite right. We take care not to modify the
+    // hand's state in the case that the call is invalid, however we're not actually
+    // returning the discarded tile so even if the call proves to be invalid the
+    // discarding player's hand is likely still in an invalid state. Depending on how we
+    // want to do the error handling logic on both the client and the server, we'll
+    // either want to return the discarded tile so that it can be returned to the
+    // discarding player or panic in order to indicate that we shouldn't attempt to
+    // recover in the case of an error.
+    #[throws(anyhow::Error)]
     pub fn call_tile(&mut self, discard: TileInstance, call: Call) {
-        todo!();
+        match call {
+            Call::Ron => {
+                self.tiles.push(discard);
+
+                // TODO: Validate that the hand is a valid mahjong.
+            }
+
+            Call::Kan => {
+                // Verify the other 3 instances of `discard` are in the player's hand before
+                // modifying any state.
+                let matching_tiles = self
+                    .tiles
+                    .iter()
+                    .filter(|instance| instance.tile == discard.tile)
+                    .count();
+                if matching_tiles != 3 {
+                    bail!(
+                        r#"Not enough tiles matching {:?} in hand for "kan" call (expected 3, found {})"#,
+                        discard,
+                        matching_tiles,
+                    );
+                }
+
+                // Remove the other 3 tiles from the player's hand and add them to an open kong.
+                let kong_tiles: Vec<_> = self
+                    .tiles
+                    .e_drain_where(|instance| instance.tile == discard.tile)
+                    .collect();
+                self.open_kongs
+                    .push([discard, kong_tiles[0], kong_tiles[1], kong_tiles[2]]);
+            }
+
+            Call::Pon => {
+                // Verify that at least 2 more instances of `discard` are in the player's hand
+                // before modifying any state.
+                let matching_tiles = self
+                    .tiles
+                    .iter()
+                    .filter(|instance| instance.tile == discard.tile)
+                    .count();
+                if matching_tiles >= 2 {
+                    bail!(
+                        r#"Not enough tiles matching {:?} in hand for "pon" call (expected at least 2, found {})"#,
+                        discard,
+                        matching_tiles,
+                    );
+                }
+
+                // Remove the first 2 matching tiles from the players hand, leaving the fourth in
+                // the hand if present.
+                let pong_tiles: Vec<_> = self
+                    .tiles
+                    .e_drain_where(|instance| instance.tile == discard.tile)
+                    .take(2)
+                    .collect();
+                self.open_pongs
+                    .push([discard, pong_tiles[0], pong_tiles[1]]);
+            }
+
+            Call::Chii(id_a, id_b) => {
+                // Verify that both specified tiles are in the player's hand and that they form a
+                // valid chow before modifying any state.
+                let tile_a = self
+                    .tiles
+                    .iter()
+                    .find(|instance| instance.id == id_a)
+                    .ok_or_else(|| anyhow!(r#"Missing tile {:?} for "chii" call"#, id_a))?;
+
+                let tile_b = self
+                    .tiles()
+                    .iter()
+                    .find(|instance| instance.id == id_b)
+                    .ok_or_else(|| anyhow!(r#"Missing tile {:?} for "chii" call"#, id_b))?;
+
+                anyhow::ensure!(
+                    tile::is_chow(discard.tile, tile_a.tile, tile_b.tile),
+                    r#"Tiles specified in "chii" call do not form a valid sequence, discard = {:?}, {:?}, {:?}"#
+                );
+
+                // Remove both tiles from the players hand and move them into an open chow.
+                //
+                // NOTE: The unwraps belows will not panic because we have already confirmed that
+                // both tiles are in the player's hand.
+                let index = self
+                    .tiles
+                    .iter()
+                    .position(|instance| instance.id == id_a)
+                    .unwrap();
+                let tile_a = self.tiles.remove(index);
+
+                let index = self
+                    .tiles
+                    .iter()
+                    .position(|instance| instance.id == id_b)
+                    .unwrap();
+                let tile_b = self.tiles.remove(index);
+
+                self.open_chows.push([discard, tile_a, tile_b]);
+            }
+        }
     }
 
     /// Calls the last discarded tile from the player's discards.

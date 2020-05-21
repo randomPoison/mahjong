@@ -194,8 +194,7 @@ impl MatchState {
             );
         }
 
-        if calls.is_empty() {}
-
+        // Find the winning call out of all calls made.
         let max = calls
             .iter()
             .max_by(|(&left_seat, &left_call), (&right_seat, &right_call)| {
@@ -220,8 +219,12 @@ impl MatchState {
             );
 
             // Add the tile to the calling player's hand, making the appropriate meld.
+            //
+            // TODO: Improve error handling here? If the call to `call_tile` returns an error,
+            // we currently lose the discard tile and leave the discarding player's hand in an
+            // inconsistent state.
             let calling_hand = self.players.get_mut(&seat).unwrap();
-            calling_hand.call_tile(discard, call);
+            calling_hand.call_tile(discard, call).unwrap();
 
             // Set the turn order to the next player after the calling player.
             self.turn_state = TurnState::AwaitingDraw(seat.next());
