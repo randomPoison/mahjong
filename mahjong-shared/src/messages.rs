@@ -4,6 +4,7 @@
 // framework once we move the communication layer into Rust.
 
 use crate::{
+    hand::Call,
     match_state::{MatchId, MatchState},
     tile::{TileId, Wind},
 };
@@ -102,11 +103,43 @@ pub struct DiscardTileRequest {
     pub tile: TileId,
 }
 
+/// An event that can happen during the match.
+///
+/// Match events are broadcast by the server to connected game clients in order to
+/// describe changes to the match state.
 #[cs_bindgen]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MatchEvent {
-    TileDrawn { seat: Wind, tile: TileId },
-    TileDiscarded { seat: Wind, tile: TileId },
+    /// A player drew a tile.
+    TileDrawn {
+        seat: Wind,
+
+        // TODO: Don't expose information about which tile the player drew. This is
+        // currently an avenue for exploits.
+        tile: TileId,
+    },
+
+    /// A player discarded a tile.
+    TileDiscarded {
+        seat: Wind,
+        tile: TileId,
+
+        /// The possible calls that the player receiving this event can make with the
+        /// discard.
+        ///
+        /// Each client only receives the list of calls that the controlled play can make.
+        /// This is an anti-cheat measure to ensure that a compromised game client cannot
+        /// expose information that the player shouldn't otherwise have.
+        calls: Vec<Call>,
+    },
+
+    /// A player called the last discarded tile.
+    Call {
+        caller: Wind,
+        called_from: Wind,
+        tile: TileId,
+        call: Call,
+    },
 
     // TODO: Include winner and scoring info. This requires support for `Option`, since
     // there may not be a winner.

@@ -295,7 +295,18 @@ impl MatchState {
 
         // Apply the event to the local state.
         match &event {
-            &MatchEvent::TileDiscarded { seat, tile } => {
+            &MatchEvent::TileDrawn { seat, tile } => {
+                assert_eq!(
+                    self.turn_state,
+                    TurnState::AwaitingDraw(seat),
+                    "Draw event does not match current turn",
+                );
+
+                let draw = self.draw_for_player(seat).expect("Unable to draw locally");
+                assert_eq!(draw, tile, "Local draw does not match draw event");
+            }
+
+            &MatchEvent::TileDiscarded { seat, tile, .. } => {
                 assert_eq!(
                     self.turn_state,
                     TurnState::AwaitingDiscard(seat),
@@ -306,15 +317,9 @@ impl MatchState {
                     .expect("Failed to discard locally");
             }
 
-            &MatchEvent::TileDrawn { seat, tile } => {
-                assert_eq!(
-                    self.turn_state,
-                    TurnState::AwaitingDraw(seat),
-                    "Draw event does not match current turn",
-                );
-
-                let draw = self.draw_for_player(seat).expect("Unable to draw locally");
-                assert_eq!(draw, tile, "Local draw does not match draw event");
+            &MatchEvent::Call { caller, call, .. } => {
+                self.call_tile(caller, Some(call))
+                    .expect("Unable to call tile locally");
             }
 
             MatchEvent::MatchEnded => {}

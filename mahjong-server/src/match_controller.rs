@@ -103,8 +103,31 @@ impl MatchController {
 
         trace!("Successfully discarded tile");
 
-        // Broadcast the discard event to all connected clients.
-        self.broadcast(MatchEvent::TileDiscarded { seat: player, tile });
+        match &self.state.turn_state {
+            // If any players can call the discarded tile, include the list of possible calls
+            // when notifying them of the discard.
+            TurnState::AwaitingCalls { waiting, .. } => {
+                for seat in Wind::iter() {
+                    let calls = waiting.get(&seat).cloned().unwrap_or_default();
+                    self.clients
+                        .get_mut(&seat)
+                        .unwrap()
+                        .send_event(MatchEvent::TileDiscarded {
+                            seat: player,
+                            tile,
+                            calls,
+                        })
+                        .expect("Failed to send match update to client");
+                }
+            }
+
+            // If we're not waiting on any calls, broadcast the discard event to all players.
+            _ => self.broadcast(MatchEvent::TileDiscarded {
+                seat: player,
+                tile,
+                calls: Default::default(),
+            }),
+        }
 
         // If the match is over and we're not waiting for any players to make a final call,
         // broadcast an event notifying all clients of the outcome.
@@ -187,8 +210,19 @@ impl DummyClient {
                 }
             }
 
-            MatchEvent::TileDiscarded { seat, tile } => {
+            MatchEvent::TileDiscarded { seat, tile, calls } => {
                 self.state.discard_tile(seat, tile).unwrap();
+
+                if !calls.is_empty() {
+                    let _ = self
+                        .controller
+                        .call_tile(self.seat, Some(calls[0].clone()))
+                        .unwrap();
+                }
+            }
+
+            MatchEvent::Call { caller, call, .. } => {
+                self.state.call_tile(caller, Some(call)).unwrap();
             }
 
             MatchEvent::MatchEnded => todo!("Figure out how to shut down actors?"),
