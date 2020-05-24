@@ -139,9 +139,13 @@ impl GameState {
 
         info!(%id, "Starting a new match");
 
-        let stage = MatchController::new(id).into_stage();
-        let proxy = stage.proxy();
-        tokio::spawn(stage.run());
+        let (builder, remote) = StageBuilder::new();
+        let proxy = remote.proxy();
+
+        // TODO: Allow players to specify how many players they want in the match when they
+        // request it. This would allow up to 3 other players to join the match before it
+        // starts.
+        builder.spawn(MatchController::new(id, 1, remote));
 
         proxy
     }

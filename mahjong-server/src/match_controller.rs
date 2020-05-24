@@ -5,7 +5,7 @@ use mahjong::{
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
 use std::collections::HashMap;
-use thespian::Actor;
+use thespian::{Actor, Remote};
 use tile::{TileId, Wind};
 use tracing::*;
 
@@ -15,11 +15,15 @@ pub struct MatchController {
     state: MatchState,
 
     /// Mapping of which client controls which player seat. Key is the index of the
-    clients: HashMap<Wind, ClientControllerProxy>,
+    clients: HashMap<Wind, ClientProxy>,
+    num_players: u8,
+
+    remote: Remote<Self>,
 }
 
 impl MatchController {
-    pub fn new(id: MatchId) -> Self {
+    // TODO: Verify that the requested number of player is at least 1 and no more than 4.
+    pub fn new(id: MatchId, num_players: u8, remote: Remote<Self>) -> Self {
         let mut rng = Pcg64Mcg::from_entropy();
 
         // Generate the tileset and shuffle it.
@@ -35,6 +39,8 @@ impl MatchController {
             rng,
             state,
             clients: Default::default(),
+            num_players,
+            remote,
         }
     }
 
@@ -55,16 +61,25 @@ impl MatchController {
 
 #[thespian::actor]
 impl MatchController {
-    pub fn id(&self) -> MatchId {
-        self.state.id
-    }
-
     pub fn join(&mut self, controller: ClientControllerProxy, seat: Wind) -> Result<MatchState> {
         if self.clients.contains_key(&seat) {
             bail!("Seat is already occupied");
         }
 
-        self.clients.insert(seat, controller);
+        self.clients.insert(seat, ClientProxy::Client(controller));
+
+        // If the expected number of players has joined the match, start the match once we
+        // finish processing the current message.
+        //
+        // NOTE: We send a message to the actor to start the match rather than performing
+        // the match start logic here because we want to make sure we send the initial match
+        // state to the joining client before we broadcast any state updates.
+        if self.clients.len() as u8 == self.num_players {
+            self.remote
+                .proxy()
+                .start_match()
+                .expect("Failed to send self a message");
+        }
 
         Ok(self.state.clone())
     }
@@ -91,52 +106,11 @@ impl MatchController {
         // Broadcast the discard event to all connected clients.
         self.broadcast(MatchEvent::TileDiscarded { seat: player, tile });
 
-        while !self.state.wall.is_empty() {
-            let player = self.state.current_turn;
-
-            // Draw the tile for the next player.
-            let draw = self.state.draw_for_player(player)?;
-            self.broadcast(MatchEvent::TileDrawn {
-                seat: player,
-                tile: draw,
-            });
-
-            if self.clients.contains_key(&player) {
-                trace!(seat = ?player, "Client at current seat, waiting for player action");
-                break;
-            }
-
-            // Automatically discard the first tile in the player's hand.
-            let auto_discard = self.state.player(player).tiles()[0].id;
-            info!(
-                seat = ?player,
-                discard = ?auto_discard,
-                "Performing action for computer-controlled player",
-            );
-
-            self.state.discard_tile(player, auto_discard)?;
-            self.broadcast(MatchEvent::TileDiscarded {
-                seat: player,
-                tile: auto_discard,
-            });
-
-            // Check to see if any players can call the discard. If the player is computer
-            // controlled, call it automatically, otherwise wait for a player to decide if
-            // they're going to call.
-            let discard_tile = tile::by_id(auto_discard);
-            let mut winning_call = None;
-            for seat in Wind::iter() {
-                let calls = self
-                    .state
-                    .player(seat)
-                    .find_possible_calls(discard_tile, seat == player.next());
-
-                if self.clients.contains_key(&seat) {}
-            }
-        }
-
-        // If the match is over, broadcast an event notifying all clients of the outcome.
-        if self.state.wall.is_empty() {
+        // If the match is over and we're not waiting for any players to make a final call,
+        // broadcast an event notifying all clients of the outcome.
+        if self.state.wall.is_empty()
+            && !matches!(self.state.turn_state, TurnState::AwaitingCalls { .. })
+        {
             self.broadcast(MatchEvent::MatchEnded);
         }
 
@@ -146,5 +120,96 @@ impl MatchController {
     #[tracing::instrument(skip(self))]
     pub fn call_tile(&mut self, player: Wind, call: Option<Call>) -> Result<()> {
         todo!()
+    }
+
+    #[tracing::instrument(skip(self))]
+    fn start_match(&mut self) {
+        for seat in Wind::iter() {
+            // NOTE: We need to manually split the borrows of `self.state` and `self.remote`
+            // here because closures can't capture disjoint fields currently. This can be
+            // cleaned up once rustc supports this.
+            // See https://github.com/rust-lang/rust/issues/53488
+            let state = &self.state;
+            let remote = &self.remote;
+            self.clients.entry(seat).or_insert_with(|| {
+                let dummy = DummyClient {
+                    seat,
+                    state: state.clone(),
+                    controller: remote.proxy(),
+                }
+                .spawn();
+
+                ClientProxy::Dummy(dummy)
+            });
+        }
+
+        // Draw the first tile and broadcast to the connected clients.
+        let seat = match &self.state.turn_state {
+            &TurnState::AwaitingDraw(seat) => seat,
+
+            _ => panic!(
+                "Unexpected turn state at start of match: {:?}",
+                self.state.turn_state,
+            ),
+        };
+
+        let tile = self
+            .state
+            .draw_for_player(seat)
+            .expect("Failed to draw for first player");
+
+        self.broadcast(MatchEvent::TileDrawn { seat, tile });
+    }
+}
+
+/// Actor that controls players that aren't controlled by an active client.
+#[derive(Debug, Actor)]
+struct DummyClient {
+    seat: Wind,
+    state: MatchState,
+    controller: MatchControllerProxy,
+}
+
+#[thespian::actor]
+impl DummyClient {
+    fn send_event(&mut self, event: MatchEvent) {
+        match event {
+            MatchEvent::TileDrawn { seat, tile } => {
+                let draw = self.state.draw_for_player(seat).unwrap();
+                assert_eq!(tile, draw);
+
+                // If the player we control drew the tile, select a tile to discard.
+                if seat == self.seat {
+                    let _ = self
+                        .controller
+                        .discard_tile(self.seat, self.state.player(self.seat).tiles()[0].id)
+                        .unwrap();
+                }
+            }
+
+            MatchEvent::TileDiscarded { seat, tile } => {
+                self.state.discard_tile(seat, tile).unwrap();
+            }
+
+            MatchEvent::MatchEnded => todo!("Figure out how to shut down actors?"),
+        }
+    }
+}
+
+/// Abstraction over either a concrete client actor or a dummy client actor.
+// TODO: Remove this once thespian has support for actor traits.
+// Tracking issue: https://github.com/randomPoison/thespian/issues/15
+#[derive(Debug, Clone)]
+enum ClientProxy {
+    Client(ClientControllerProxy),
+    Dummy(DummyClientProxy),
+}
+
+impl ClientProxy {
+    pub fn send_event(&mut self, event: MatchEvent) -> Result<(), thespian::MessageError> {
+        match self {
+            ClientProxy::Client(proxy) => proxy.send_event(event),
+            ClientProxy::Dummy(proxy) => proxy.send_event(event),
+        }
     }
 }
