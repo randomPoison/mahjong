@@ -138,7 +138,7 @@ pub enum MatchEvent {
         caller: Wind,
         called_from: Wind,
         tile: TileId,
-        call: Call,
+        winning_call: Call,
     },
 
     // TODO: Include winner and scoring info. This requires support for `Option`, since

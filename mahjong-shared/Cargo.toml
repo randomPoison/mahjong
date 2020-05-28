@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 anyhow = "1.0.28"
-cs-bindgen = { git = "https://github.com/randomPoison/cs-bindgen", rev = "51363e7" }
+cs-bindgen = { git = "https://github.com/randomPoison/cs-bindgen", rev = "b90dba1" }
 derive_more = "0.99.2"
 fehler = "1.0.0"
 itertools = "0.9.0"

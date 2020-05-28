@@ -121,20 +121,32 @@ impl MatchController {
                 }
             }
 
-            // If we're not waiting on any calls, broadcast the discard event to all players.
-            _ => self.broadcast(MatchEvent::TileDiscarded {
-                seat: player,
-                tile,
-                calls: Default::default(),
-            }),
-        }
+            &TurnState::AwaitingDraw(next_player) => {
+                self.broadcast(MatchEvent::TileDiscarded {
+                    seat: player,
+                    tile,
+                    calls: Default::default(),
+                });
 
-        // If the match is over and we're not waiting for any players to make a final call,
-        // broadcast an event notifying all clients of the outcome.
-        if self.state.wall.is_empty()
-            && !matches!(self.state.turn_state, TurnState::AwaitingCalls { .. })
-        {
-            self.broadcast(MatchEvent::MatchEnded);
+                let draw = self.state.draw_for_player(next_player)?;
+                self.broadcast(MatchEvent::TileDrawn {
+                    seat: next_player,
+                    tile: draw,
+                });
+            }
+
+            TurnState::MatchEnded { .. } => {
+                self.broadcast(MatchEvent::TileDiscarded {
+                    seat: player,
+                    tile,
+                    calls: Default::default(),
+                });
+
+                self.broadcast(MatchEvent::MatchEnded);
+            }
+
+            // If we're not waiting on any calls, broadcast the discard event to all players.
+            _ => panic!("Unexpected turn state: {:?}", self.state.turn_state),
         }
 
         Ok(())
@@ -221,8 +233,12 @@ impl DummyClient {
                 }
             }
 
-            MatchEvent::Call { caller, call, .. } => {
-                self.state.call_tile(caller, Some(call)).unwrap();
+            MatchEvent::Call {
+                caller,
+                winning_call,
+                ..
+            } => {
+                self.state.call_tile(caller, Some(winning_call)).unwrap();
             }
 
             MatchEvent::MatchEnded => todo!("Figure out how to shut down actors?"),

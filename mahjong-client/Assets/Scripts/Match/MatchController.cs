@@ -1,8 +1,9 @@
-﻿using System;
+﻿using Synapse.Utils;
+using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using Synapse.Utils;
 using UniRx.Async;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -96,11 +97,6 @@ namespace Synapse.Mahjong.Match
 
             // Once we have the match data, instantiate the tiles for each player's
             // starting hand.
-            //
-            // TODO: Move tile placement logic into `PlayerHand`. The match controller
-            // should only need to add and remove tiles from the hands as the match's
-            // state advances, and the `PlayerHand` script should handle layout and
-            // positioning.
             foreach (var seat in EnumUtils.GetValues<Wind>())
             {
                 var hand = _hands[(int)seat];
@@ -119,16 +115,45 @@ namespace Synapse.Mahjong.Match
                 }
             }
 
-            // If the local player has the first turn, have them discard a tile now.
-            if (_localState.CurrentTurn() == _seat)
-            {
-                await DiscardTile();
-            }
-
             // Process incoming updates from the server.
             var matchEnded = false;
             while (!matchEnded)
             {
+                // Check the current state of the match and determine if there's any
+                // action that the local player needs to take.
+                var turnState = _localState.TurnState();
+                switch (turnState)
+                {
+                    // If it's the current player's turn to discard, wait for the player
+                    // to choose their discard tile.
+                    case TurnState.AwaitingDiscard awaitingDiscard:
+                    {
+                        if (awaitingDiscard.Element0 == _seat)
+                        {
+                            await DiscardTile();
+                        }
+                    }
+                    break;
+
+                    // If the player can call the last discarded tile, give them a
+                    // chance to choose if they want to call the tile or pass.
+                    case TurnState.AwaitingCalls awaitingCalls:
+                    {
+                        if (awaitingCalls.Calls.ContainsKey(_seat))
+                        {
+                            throw new NotImplementedException("Handle calling tiles");
+                        }
+                    }
+                    break;
+
+                    case TurnState.AwaitingDraw awaitingDraw:
+                    case TurnState.MatchEnded _:
+                        break;
+
+                    default:
+                        throw new NotImplementedException($"Unhandled turn state: {turnState}");
+                }
+
                 // Wait to receive the next update from the server.
                 var eventJson = await _socket.RecvStringAsync(_cancellation.Token);
 
@@ -226,6 +251,9 @@ namespace Synapse.Mahjong.Match
                         matchEnded = true;
                     }
                     break;
+
+                    default:
+                        throw new NotImplementedException($"Unhandled match event: {update}");
                 }
             }
 

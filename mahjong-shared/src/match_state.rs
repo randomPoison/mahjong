@@ -317,8 +317,12 @@ impl MatchState {
                     .expect("Failed to discard locally");
             }
 
-            &MatchEvent::Call { caller, call, .. } => {
-                self.call_tile(caller, Some(call))
+            &MatchEvent::Call {
+                caller,
+                winning_call,
+                ..
+            } => {
+                self.call_tile(caller, Some(winning_call))
                     .expect("Unable to call tile locally");
             }
 
@@ -397,5 +401,9 @@ pub enum TurnState {
         /// Key is the seat of the player that can call, value is the list of valid calls
         /// for the player.
         waiting: HashMap<Wind, Vec<Call>>,
+    },
+
+    MatchEnded {
+        winner: Wind,
     },
 }
