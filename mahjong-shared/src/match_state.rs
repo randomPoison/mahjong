@@ -1,6 +1,7 @@
 //! Functionality for actually playing a mahjong match.
 
 use crate::{
+    client::LocalState,
     hand::{self, Call, HandState},
     messages::*,
     tile::{self, TileId, TileInstance, Wind},
@@ -236,6 +237,32 @@ impl MatchState {
             self.turn_state = TurnState::AwaitingDraw(discarding_player.next());
             None
         }
+    }
+
+    pub fn local_state_for_player(&self, seat: Wind) -> LocalState {
+        // TODO: Find a better solution for converting between the `MatchState`
+        // representation of players and `LocalState` representation. This approach of
+        // hard-coding the list of players in the list is overly-verbose and error-prone.
+        let players = [
+            self.players
+                .get(&Wind::East)
+                .unwrap()
+                .to_local(seat == Wind::East),
+            self.players
+                .get(&Wind::South)
+                .unwrap()
+                .to_local(seat == Wind::South),
+            self.players
+                .get(&Wind::West)
+                .unwrap()
+                .to_local(seat == Wind::West),
+            self.players
+                .get(&Wind::North)
+                .unwrap()
+                .to_local(seat == Wind::North),
+        ];
+
+        LocalState { seat, players }
     }
 }
 

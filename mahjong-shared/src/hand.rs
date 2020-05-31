@@ -1,4 +1,7 @@
-use crate::tile::{self, Tile, TileId, TileInstance};
+use crate::{
+    client::LocalHand,
+    tile::{self, Tile, TileId, TileInstance},
+};
 use anyhow::{anyhow, bail};
 use cs_bindgen::prelude::*;
 use fehler::{throw, throws};
@@ -334,6 +337,20 @@ impl HandState {
 
     pub fn discards(&self) -> &[TileInstance] {
         &self.discards
+    }
+
+    /// Gets a copy of the hand state as a `LocalHand`.
+    ///
+    /// Returns a `LocalHand::Local` if `is_local_player` is `true`, otherwise returns a
+    /// `LocalHand::Remote`.
+    pub fn to_local(&self, is_local_player: bool) -> LocalHand {
+        if is_local_player {
+            LocalHand::Local(self.clone())
+        } else {
+            LocalHand::Remote {
+                discards: self.discards.iter().map(|instance| instance.id).collect(),
+            }
+        }
     }
 }
 

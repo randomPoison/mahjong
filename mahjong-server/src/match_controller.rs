@@ -1,6 +1,7 @@
 use crate::client_controller::ClientControllerProxy;
 use mahjong::{
-    anyhow::*, hand::Call, match_state::*, messages::MatchEvent, strum::IntoEnumIterator, tile,
+    anyhow::*, client::LocalState, hand::Call, match_state::*, messages::MatchEvent,
+    strum::IntoEnumIterator, tile,
 };
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
@@ -61,7 +62,7 @@ impl MatchController {
 
 #[thespian::actor]
 impl MatchController {
-    pub fn join(&mut self, controller: ClientControllerProxy, seat: Wind) -> Result<MatchState> {
+    pub fn join(&mut self, controller: ClientControllerProxy, seat: Wind) -> Result<LocalState> {
         if self.clients.contains_key(&seat) {
             bail!("Seat is already occupied");
         }
@@ -81,7 +82,7 @@ impl MatchController {
                 .expect("Failed to send self a message");
         }
 
-        Ok(self.state.clone())
+        Ok(self.state.local_state_for_player(seat))
     }
 
     /// Returns the updated match state if the requested discard is valid.

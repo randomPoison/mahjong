@@ -4,7 +4,7 @@
 pub use anyhow;
 pub use strum;
 
-mod client;
+pub mod client;
 pub mod hand;
 pub mod match_state;
 pub mod messages;
