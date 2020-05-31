@@ -1,4 +1,4 @@
-use crate::{client::*, match_controller::*};
+use crate::{client_controller::*, match_controller::*};
 use futures::prelude::*;
 use mahjong::{match_state::*, messages::*};
 use std::{collections::HashMap, sync::Arc};
@@ -7,7 +7,7 @@ use tracing::*;
 use tracing_futures::Instrument;
 use warp::Filter;
 
-mod client;
+mod client_controller;
 mod match_controller;
 
 #[tokio::main]
@@ -122,7 +122,7 @@ impl GameState {
 
         // Setup initial state for the account. We'll start players out with 10,000
         // points because why not.
-        let data = PlayerState { points: 10_000 };
+        let data = AccountState { points: 10_000 };
 
         // Store the new account.
         let account = Account { credentials, data };
@@ -154,7 +154,7 @@ impl GameState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Account {
     credentials: Credentials,
-    data: PlayerState,
+    data: AccountState,
 }
 
 static INDEX_HTML: &str = r#"

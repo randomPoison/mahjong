@@ -291,6 +291,7 @@ lazy_static! {
 ///
 /// [`TileId`]: struct.TileId.html
 /// [`Tile`]: struct.Tile.html
+#[cs_bindgen]
 pub fn by_id(id: TileId) -> Tile {
     TILE_SET
         .iter()

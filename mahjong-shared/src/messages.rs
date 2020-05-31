@@ -4,8 +4,9 @@
 // framework once we move the communication layer into Rust.
 
 use crate::{
+    client::LocalState,
     hand::Call,
-    match_state::{MatchId, MatchState},
+    match_state::MatchId,
     tile::{TileId, Wind},
 };
 use cs_bindgen::prelude::*;
@@ -35,7 +36,7 @@ pub struct HandshakeResponse {
     pub server_version: Version,
 
     pub new_credentials: Option<Credentials>,
-    pub account_data: PlayerState,
+    pub account_data: AccountState,
 }
 
 /// Unique ID for a game account.
@@ -70,7 +71,7 @@ pub struct SessionId(u32);
 // TODO: Rename this to `AccountState`.
 #[cs_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PlayerState {
+pub struct AccountState {
     /// The points balance for the player, currently the only resource in the game.
     pub points: u64,
 }
@@ -93,7 +94,7 @@ pub enum ClientRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartMatchResponse {
-    pub state: MatchState,
+    pub state: LocalState,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

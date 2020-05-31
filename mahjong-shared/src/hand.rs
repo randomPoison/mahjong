@@ -28,7 +28,7 @@ use vec_drain_where::VecDrainWhereExt;
 /// will not generally attempt to detect duplicate instances of the same tile.
 #[cs_bindgen]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Hand {
+pub struct HandState {
     // "Active" tiles in the player's hand, i.e. ones that can still be discarded.
     tiles: Vec<TileInstance>,
     current_draw: Option<TileInstance>,
@@ -47,7 +47,7 @@ pub struct Hand {
     discards: Vec<TileInstance>,
 }
 
-impl Hand {
+impl HandState {
     /// Creates a new hand by drawing the starting tiles from `draw_from`.
     ///
     /// Draws 13 tiles from the end of `draw_from` to populate the starting hand.
@@ -62,7 +62,7 @@ impl Hand {
             draw_from.len()
         );
 
-        Hand {
+        HandState {
             tiles: draw_from.split_off(draw_from.len() - 13),
             current_draw: None,
             open_chows: Default::default(),

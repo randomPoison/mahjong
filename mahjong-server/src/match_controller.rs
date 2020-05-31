@@ -1,4 +1,4 @@
-use crate::client::ClientControllerProxy;
+use crate::client_controller::ClientControllerProxy;
 use mahjong::{
     anyhow::*, hand::Call, match_state::*, messages::MatchEvent, strum::IntoEnumIterator, tile,
 };

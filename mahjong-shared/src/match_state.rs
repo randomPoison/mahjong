@@ -1,7 +1,7 @@
 //! Functionality for actually playing a mahjong match.
 
 use crate::{
-    hand::{self, Call, Hand},
+    hand::{self, Call, HandState},
     messages::*,
     tile::{self, TileId, TileInstance, Wind},
 };
@@ -22,7 +22,7 @@ pub struct MatchState {
     // TODO: Setup a better way of storing the players. Right now getting access to a
     // player always requires an `unwrap`, even though we know ahead of time that
     // there's a player for each wind.
-    pub players: HashMap<Wind, Hand>,
+    pub players: HashMap<Wind, HandState>,
 
     /// The live wall that players will draw from.
     pub wall: Vec<TileInstance>,
@@ -36,10 +36,10 @@ impl MatchState {
         Self {
             id,
             players: hashmap! {
-                Wind::East => Hand::new(&mut tiles),
-                Wind::South => Hand::new(&mut tiles),
-                Wind::West => Hand::new(&mut tiles),
-                Wind::North => Hand::new(&mut tiles),
+                Wind::East => HandState::new(&mut tiles),
+                Wind::South => HandState::new(&mut tiles),
+                Wind::West => HandState::new(&mut tiles),
+                Wind::North => HandState::new(&mut tiles),
             },
 
             // TODO: Split the dead wall from the live wall and draw out an initial hand.
@@ -49,7 +49,7 @@ impl MatchState {
         }
     }
 
-    pub fn player(&self, seat: Wind) -> &Hand {
+    pub fn player(&self, seat: Wind) -> &HandState {
         self.players.get(&seat).unwrap()
     }
 
