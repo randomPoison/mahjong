@@ -1,10 +1,12 @@
 use crate::{
     hand::HandState,
+    match_state::MatchId,
     messages::*,
     tile::{TileId, Wind},
 };
 use cs_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tracing::*;
 
 /// Main game state tracking for the client.
@@ -84,17 +86,75 @@ impl ClientState {
     }
 }
 
+/// The local state that a client has access to when playing in an online match.
 // TODO: This should go in a `Mahjong.Match` namespace.
 #[cs_bindgen]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LocalState {
+    pub id: MatchId,
     pub seat: Wind,
-    pub players: [LocalHand; 4],
+    pub players: HashMap<Wind, LocalHand>,
+}
+
+#[cs_bindgen]
+impl LocalState {
+    pub fn id(&self) -> MatchId {
+        self.id
+    }
+
+    pub fn seat(&self) -> Wind {
+        self.seat
+    }
+
+    // HACK: Expose separate getters for remote and local hands because we can't
+    // directly expose `LocalHand`. This is because `LocalHand` is a value type which
+    // contains a handle type `HandState`, and right now cs-bindgen doesn't support
+    // handle types within value types. Once the necessary functionality is added
+    // upstream we should be able to directly return a `&LocalHand` directly.
+    //
+    // See https://github.com/randomPoison/cs-bindgen/issues/59.
+
+    pub fn local_hand(&self, seat: Wind) -> HandState {
+        match &self.players[&seat] {
+            LocalHand::Local(hand) => hand.clone(),
+
+            _ => panic!(
+                "Expected seat {:?} to be the local hand, but was a remote hand",
+                seat,
+            ),
+        }
+    }
+
+    pub fn remote_discards(&self, seat: Wind) -> Vec<TileId> {
+        match &self.players[&seat] {
+            LocalHand::Remote { discards, .. } => discards.clone(),
+
+            _ => panic!(
+                "Expected seat {:?} to be remote, but was the local hand",
+                seat,
+            ),
+        }
+    }
+
+    pub fn player_has_current_draw(&self, seat: Wind) -> bool {
+        match &self.players[&seat] {
+            LocalHand::Remote { has_draw, .. } => *has_draw,
+            LocalHand::Local(state) => state.current_draw().is_some(),
+        }
+    }
 }
 
 // TODO: This should go in a `Mahjong.Match` namespace.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LocalHand {
+    /// The hand for the player controlled by the client. Contains the full state
+    /// information for the hand.
     Local(HandState),
-    Remote { discards: Vec<TileId> },
+
+    /// The hand information for a remote player. Only contains the discards for the
+    /// player.
+    Remote {
+        has_draw: bool,
+        discards: Vec<TileId>,
+    },
 }

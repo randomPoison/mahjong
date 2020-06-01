@@ -54,6 +54,8 @@ namespace Synapse.Mahjong.Match
 
         #endregion
 
+        #region Local hand
+
         public void AddToHand(TileView tile)
         {
             // Add the tile to the internal state tracking for the hand.
@@ -165,6 +167,22 @@ namespace Synapse.Mahjong.Match
                 TileClicked -= Handler;
             }
         }
+
+        #endregion
+
+        #region Remote hand
+
+        public void FillWithDummyTiles()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void DrawDummyTile()
+        {
+            throw new NotImplementedException();
+        }
+
+        #endregion
 
         #region Event Handlers
 

@@ -51,8 +51,8 @@ namespace Synapse.Mahjong.Match
         // TODO: Move the tracking for sever state vs local state into the Rust layer.
         // It'll be easier to write and test the reconciliation logic there, and would
         // allow us to simplify the client code.
-        private MatchState _serverState;
-        private MatchState _localState;
+        private LocalState _serverState;
+        private LocalState _localState;
 
         private Wind _seat;
 
@@ -100,18 +100,32 @@ namespace Synapse.Mahjong.Match
             {
                 var hand = _hands[(int)seat];
 
-                var tiles = _localState.PlayerHand(seat);
-
-                foreach (var tile in tiles)
+                if (seat == _localState.Seat())
                 {
-                    hand.AddToHand(InstantiateTile(tile));
+                    var handState = _localState.LocalHand(seat);
+                    var tiles = handState.GetTiles();
+
+                    foreach (var tile in tiles)
+                    {
+                        hand.AddToHand(InstantiateTile(tile));
+                    }
+
+                    if (handState.HasCurrentDraw())
+                    {
+                        var currentDraw = handState.GetCurrentDraw();
+                        hand.DrawTile(InstantiateTile(currentDraw));
+                    }
+                }
+                else
+                {
+                    hand.FillWithDummyTiles();
+
+                    if (_localState.PlayerHasCurrentDraw(seat))
+                    {
+                        hand.DrawDummyTile();
+                    }
                 }
 
-                if (_localState.PlayerHasCurrentDraw(seat))
-                {
-                    var currentDraw = _localState.CurrentDraw(seat);
-                    hand.DrawTile(InstantiateTile(currentDraw));
-                }
             }
 
             // Process incoming updates from the server.

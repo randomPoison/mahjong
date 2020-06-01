@@ -349,8 +349,26 @@ impl HandState {
         } else {
             LocalHand::Remote {
                 discards: self.discards.iter().map(|instance| instance.id).collect(),
+                has_draw: self.current_draw.is_some(),
             }
         }
+    }
+}
+
+// TODO: Remove these exported getters since they're strictly worse versions of the ones
+// defined above. Once we can properly export those functions, these won't be necessary.
+#[cs_bindgen]
+impl HandState {
+    pub fn get_tiles(&self) -> Vec<TileInstance> {
+        self.tiles.clone()
+    }
+
+    pub fn has_current_draw(&self) -> bool {
+        self.current_draw.is_some()
+    }
+
+    pub fn get_current_draw(&self) -> TileInstance {
+        self.current_draw.clone().unwrap()
     }
 }
 
