@@ -1,5 +1,5 @@
 use crate::{
-    hand::HandState,
+    hand::{Call, HandState},
     match_state::MatchId,
     messages::*,
     tile::{TileId, Wind},
@@ -94,6 +94,7 @@ pub struct LocalState {
     pub id: MatchId,
     pub seat: Wind,
     pub players: HashMap<Wind, LocalHand>,
+    pub turn_state: LocalTurnState,
 }
 
 #[cs_bindgen]
@@ -142,6 +143,33 @@ impl LocalState {
             LocalHand::Local(state) => state.current_draw().is_some(),
         }
     }
+
+    pub fn turn_state(&self) -> LocalTurnState {
+        self.turn_state.clone()
+    }
+}
+
+/// The turn information for `LocalState`.
+///
+/// Mirrors `TurnState` but doesn't expose state information about players other
+/// than the local one. Notably, the `AwaitingCalls` state doesn't include the list
+/// of players that can call the discarded tile.
+#[cs_bindgen]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LocalTurnState {
+    AwaitingDraw(Wind),
+
+    AwaitingDiscard(Wind),
+
+    AwaitingCalls {
+        discarding_player: Wind,
+        discard: TileId,
+        calls: Vec<Call>,
+    },
+
+    MatchEnded {
+        winner: Wind,
+    },
 }
 
 // TODO: This should go in a `Mahjong.Match` namespace.

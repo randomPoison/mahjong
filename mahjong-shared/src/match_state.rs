@@ -1,7 +1,7 @@
 //! Functionality for actually playing a mahjong match.
 
 use crate::{
-    client::LocalState,
+    client::{LocalState, LocalTurnState},
     hand::{self, Call, HandState},
     messages::*,
     tile::{self, TileId, TileInstance, Wind},
@@ -240,20 +240,21 @@ impl MatchState {
         }
     }
 
-    pub fn local_state_for_player(&self, seat: Wind) -> LocalState {
+    pub fn local_state_for_player(&self, player: Wind) -> LocalState {
         // TODO: Find a better solution for converting between the `MatchState`
         // representation of players and `LocalState` representation. This approach of
         // hard-coding the list of players in the list is overly-verbose and error-prone.
         let players = self
             .players
             .iter()
-            .map(|(&player_seat, hand)| (player_seat, hand.to_local(seat == player_seat)))
+            .map(|(&player_seat, hand)| (player_seat, hand.to_local(player == player_seat)))
             .collect();
 
         LocalState {
             id: self.id,
-            seat,
+            seat: player,
             players,
+            turn_state: self.turn_state.to_local(player),
         }
     }
 }
@@ -425,4 +426,26 @@ pub enum TurnState {
     MatchEnded {
         winner: Wind,
     },
+}
+
+impl TurnState {
+    pub fn to_local(&self, player: Wind) -> LocalTurnState {
+        match self {
+            &TurnState::AwaitingDraw(seat) => LocalTurnState::AwaitingDraw(seat),
+            &TurnState::AwaitingDiscard(seat) => LocalTurnState::AwaitingDiscard(seat),
+
+            &TurnState::AwaitingCalls {
+                discarding_player,
+                discard,
+                ref waiting,
+                ..
+            } => LocalTurnState::AwaitingCalls {
+                discarding_player,
+                discard,
+                calls: waiting.get(&player).cloned().unwrap_or_default(),
+            },
+
+            &TurnState::MatchEnded { winner } => LocalTurnState::MatchEnded { winner },
+        }
+    }
 }

@@ -139,7 +139,7 @@ namespace Synapse.Mahjong.Match
                 {
                     // If it's the current player's turn to discard, wait for the player
                     // to choose their discard tile.
-                    case TurnState.AwaitingDiscard awaitingDiscard:
+                    case LocalTurnState.AwaitingDiscard awaitingDiscard:
                     {
                         if (awaitingDiscard.Element0 == _seat)
                         {
@@ -150,17 +150,17 @@ namespace Synapse.Mahjong.Match
 
                     // If the player can call the last discarded tile, give them a
                     // chance to choose if they want to call the tile or pass.
-                    case TurnState.AwaitingCalls awaitingCalls:
+                    case LocalTurnState.AwaitingCalls awaitingCalls:
                     {
-                        if (awaitingCalls.Calls.ContainsKey(_seat))
+                        if (awaitingCalls.Calls.Count > 0)
                         {
                             throw new NotImplementedException("Handle calling tiles");
                         }
                     }
                     break;
 
-                    case TurnState.AwaitingDraw awaitingDraw:
-                    case TurnState.MatchEnded _:
+                    case LocalTurnState.AwaitingDraw _:
+                    case LocalTurnState.MatchEnded _:
                         break;
 
                     default:
