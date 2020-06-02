@@ -309,7 +309,8 @@ impl MatchState {
         serde_json::to_string(&request).unwrap()
     }
 
-    // TODO: Return a `Result` here
+    // TODO: Make `json` a `&str` and return a `Result` here instead of panicking on
+    // errors. Both of these are pending support in cs-bindgen.
     pub fn handle_event(&mut self, json: String) -> MatchEvent {
         let event = serde_json::from_str(&json).unwrap();
 
