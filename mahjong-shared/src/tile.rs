@@ -293,11 +293,31 @@ lazy_static! {
 /// [`Tile`]: struct.Tile.html
 #[cs_bindgen]
 pub fn by_id(id: TileId) -> Tile {
-    TILE_SET
+    instance_by_id(id).tile
+}
+
+pub fn instance_by_id(id: TileId) -> TileInstance {
+    *TILE_SET
         .iter()
         .find(|instance| instance.id == id)
-        .map(|instance| instance.tile)
         .unwrap_or_else(|| panic!("Unknown tile ID: {:?}", id))
+}
+
+/// Gets all four instances of the specified tile.
+pub fn all_instances_of(tile: Tile) -> [TileInstance; 4] {
+    let first_index = TILE_SET
+        .iter()
+        .position(|instance| instance.tile == tile)
+        .unwrap_or_else(|| panic!("Tile {:?} not found in the tile set", tile));
+
+    // Get a slice of the four instances of `tile`.
+    let tiles = &TILE_SET[first_index..first_index + 4];
+
+    // Verify that the four tiles starting at `first_index` are the four instances of
+    // `tile`.
+    debug_assert!(tiles.iter().all(|instance| instance.tile == tile));
+
+    [tiles[0], tiles[1], tiles[2], tiles[3]]
 }
 
 /// Determines if the given tiles form a chow, i.e. a sequence in the same suit.

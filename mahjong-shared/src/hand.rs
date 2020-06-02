@@ -1,8 +1,8 @@
 use crate::{
-    client::LocalHand,
+    client::{LocalHand, RemoteHand},
     tile::{self, Tile, TileId, TileInstance},
 };
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, ensure, Context};
 use cs_bindgen::prelude::*;
 use fehler::{throw, throws};
 use itertools::Itertools;
@@ -161,28 +161,34 @@ impl HandState {
 
         // Count how many copies of the discarded tile are in the player's hand to determine
         // if we can call pon or kan.
-        let matching_tiles_in_hand = self
+        let matching_tiles_in_hand: Vec<_> = self
             .tiles
             .iter()
             .filter(|instance| instance.tile == discard)
-            .count();
+            .collect();
 
         assert!(
-            matching_tiles_in_hand <= 3,
+            matching_tiles_in_hand.len() <= 3,
             "Too many instances of {:?}! {} in players hand, plus the discard",
             discard,
-            matching_tiles_in_hand,
+            matching_tiles_in_hand.len(),
         );
 
         // If there are at least 2 other instances of the discarded tile, we can call "pon".
-        if matching_tiles_in_hand >= 2 {
-            calls.push(Call::Pon);
+        // Even if there are multiple valid ways to form the "pon" call (i.e. if there are 3
+        // copies in the players hand we can form 3 different combinations) we only return a
+        // single possible call because all are functionally equivalent.
+        if matching_tiles_in_hand.len() >= 2 {
+            calls.push(Call::Pon(
+                matching_tiles_in_hand[0].id,
+                matching_tiles_in_hand[1].id,
+            ));
         }
 
         // If the three other instances of the discarded tile are in the player's hand, we
         // can call "kan".
-        if matching_tiles_in_hand == 3 {
-            calls.push(Call::Kan);
+        if matching_tiles_in_hand.len() == 3 {
+            calls.push(Call::Kan(discard));
         }
 
         calls
@@ -211,7 +217,12 @@ impl HandState {
                 // TODO: Validate that the hand is a valid mahjong.
             }
 
-            Call::Kan => {
+            Call::Kan(tile) => {
+                assert_eq!(
+                    tile, discard.tile,
+                    "Call made does not match the specified discard",
+                );
+
                 // Verify the other 3 instances of `discard` are in the player's hand before
                 // modifying any state.
                 let matching_tiles = self
@@ -236,31 +247,34 @@ impl HandState {
                     .push([discard, kong_tiles[0], kong_tiles[1], kong_tiles[2]]);
             }
 
-            Call::Pon => {
-                // Verify that at least 2 more instances of `discard` are in the player's hand
-                // before modifying any state.
-                let matching_tiles = self
-                    .tiles
-                    .iter()
-                    .filter(|instance| instance.tile == discard.tile)
-                    .count();
-                if matching_tiles >= 2 {
-                    bail!(
-                        r#"Not enough tiles matching {:?} in hand for "pon" call (expected at least 2, found {})"#,
-                        discard,
-                        matching_tiles,
-                    );
-                }
+            Call::Pon(id_a, id_b) => {
+                // Verify that both `id_a` and `id_b` are in the hand before making any
+                // modifications to state.
+                ensure!(
+                    self.tiles.iter().any(|instance| instance.id == id_a),
+                    "Tile {:?} not found in hand when it was specified as part of call {:?}",
+                    id_a,
+                    call,
+                );
 
-                // Remove the first 2 matching tiles from the players hand, leaving the fourth in
-                // the hand if present.
-                let pong_tiles: Vec<_> = self
-                    .tiles
-                    .e_drain_where(|instance| instance.tile == discard.tile)
-                    .take(2)
-                    .collect();
-                self.open_pongs
-                    .push([discard, pong_tiles[0], pong_tiles[1]]);
+                ensure!(
+                    self.tiles.iter().any(|instance| instance.id == id_b),
+                    "Tile {:?} not found in hand when it was specified as part of call {:?}",
+                    id_b,
+                    call,
+                );
+
+                // Remove the specified tiles from the hand.
+                let tile_a = self.remove_tile_by_id(id_a).with_context(|| {
+                    format!("Making call {:?} for discarded tile {:?}", call, discard)
+                })?;
+
+                let tile_b = self.remove_tile_by_id(id_b).with_context(|| {
+                    format!("Making call {:?} for discarded tile {:?}", call, discard)
+                })?;
+
+                // Add the meld the list of open pongs.
+                self.open_pongs.push([discard, tile_a, tile_b]);
             }
 
             Call::Chii(id_a, id_b) => {
@@ -347,11 +361,27 @@ impl HandState {
         if is_local_player {
             LocalHand::Local(self.clone())
         } else {
-            LocalHand::Remote {
-                discards: self.discards.iter().map(|instance| instance.id).collect(),
-                has_draw: self.current_draw.is_some(),
-            }
+            LocalHand::Remote(RemoteHand {
+                tiles: self.tiles.len() as u8,
+                has_current_draw: self.current_draw.is_some(),
+                open_chows: self.open_chows.clone(),
+                open_pongs: self.open_pongs.clone(),
+                open_kongs: self.open_kongs.clone(),
+                closed_kongs: self.closed_kongs.clone(),
+                discards: self.discards.clone(),
+            })
         }
+    }
+
+    #[throws(anyhow::Error)]
+    fn remove_tile_by_id(&mut self, id: TileId) -> TileInstance {
+        let index = self
+            .tiles
+            .iter()
+            .position(|instance| instance.id == id)
+            .ok_or_else(|| anyhow!("Tile ID {:?} not found in hand", id))?;
+
+        self.tiles.remove(index)
     }
 }
 
@@ -390,18 +420,20 @@ pub enum Call {
 
     /// A "pon" call, making a pong meld (i.e. three of a kind).
     ///
-    /// No tiles from the hand are specified, since even if there are technically
-    /// multiple ways to make the call there's no meaningful distinction between them.
-    Pon,
+    /// Specifies the two tiles from the hand that complete the sequence.
+    Pon(TileId, TileId),
 
     /// A "kan" call, making a kong meld (i.e. four of a kind).
     ///
     /// Only represents a call to form an open kong, since closed kongs are made from
-    /// draws instead of discards. No tiles from the hand are specified, since there
-    /// is only ever at most one way to make a kong.
-    Kan,
+    /// draws instead of discards. None of the specific tile IDs are given since a kong
+    /// is always made of all four copies of the tile. The `Tile` value for the kong is
+    /// provided to assist with validation (i.e. to ensure that the last discarded tile
+    /// has the correct tile value).
+    Kan(Tile),
 
-    /// A call for a player's winning tile. Can be a "chii", a "pon", or one of the
+    /// A call for a player's winning tile. Can be a "chii", a "pon", or the other tile
+    /// needed to make the final pair.
     Ron,
 }
 
@@ -441,14 +473,14 @@ pub fn compare_calls(
 
         (Call::Ron, _) => Ordering::Greater,
 
-        (Call::Kan, Call::Ron) => Ordering::Less,
-        (Call::Kan, Call::Kan) => panic!(r#"More than one "kan" call for discard"#),
-        (Call::Kan, _) => Ordering::Greater,
+        (Call::Kan(_), Call::Ron) => Ordering::Less,
+        (Call::Kan(_), Call::Kan(_)) => panic!(r#"More than one "kan" call for discard"#),
+        (Call::Kan(_), _) => Ordering::Greater,
 
-        (Call::Pon, Call::Ron) => Ordering::Less,
-        (Call::Pon, Call::Kan) => Ordering::Less,
-        (Call::Pon, Call::Pon) => panic!(r#"More than one "pon" call for discard"#),
-        (Call::Pon, Call::Chii(..)) => Ordering::Greater,
+        (Call::Pon(..), Call::Ron) => Ordering::Less,
+        (Call::Pon(..), Call::Kan(_)) => Ordering::Less,
+        (Call::Pon(..), Call::Pon(..)) => panic!(r#"More than one "pon" call for discard"#),
+        (Call::Pon(..), Call::Chii(..)) => Ordering::Greater,
 
         (Call::Chii(..), Call::Chii(..)) => panic!(r#"More than one "chii" call for discard"#),
         (Call::Chii(..), _) => Ordering::Less,
@@ -496,19 +528,20 @@ mod tests {
 
     #[test]
     fn call_precedence() {
-        // Grab the ID of the first tile in `TILE_SET` to use as a dummy ID when checking
-        // chii calls. The tiles selected in the call shouldn't impact ordering, so it
-        // doesn't matter that it's not technically valid to have two of the same ID in the
-        // call.
+        // Grab the ID and value of the first tile in `TILE_SET` to use as dummy values when
+        // checking calls that specify the ID/value of the tiles forming the call. These
+        // values don't matter when determining precedence, so we don't worry about
+        // specifying valid values.
         let id = TILE_SET[0].id;
+        let tile = TILE_SET[0].tile;
 
         // "Ron" has highest precedence.
         assert_eq!(
-            compare_calls(East, Ron, West, Kan, South),
+            compare_calls(East, Ron, West, Kan(tile), South),
             Ordering::Greater
         );
         assert_eq!(
-            compare_calls(East, Ron, West, Pon, South),
+            compare_calls(East, Ron, West, Pon(id, id), South),
             Ordering::Greater
         );
         assert_eq!(
@@ -525,17 +558,17 @@ mod tests {
 
         // "Kan" has next highest.
         assert_eq!(
-            compare_calls(East, Kan, West, Pon, South),
+            compare_calls(East, Kan(tile), West, Pon(id, id), South),
             Ordering::Greater
         );
         assert_eq!(
-            compare_calls(East, Kan, West, Chii(id, id), South),
+            compare_calls(East, Kan(tile), West, Chii(id, id), South),
             Ordering::Greater
         );
 
         // "Pon" only has precedence over "chii".
         assert_eq!(
-            compare_calls(East, Pon, West, Chii(id, id), South),
+            compare_calls(East, Pon(id, id), West, Chii(id, id), South),
             Ordering::Greater
         );
     }

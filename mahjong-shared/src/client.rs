@@ -176,7 +176,9 @@ impl LocalState {
                     "Draw event does not match current turn",
                 );
 
-                self.players[&seat]
+                self.players
+                    .get_mut(&seat)
+                    .unwrap()
                     .draw_tile(id)
                     .expect("Unable to draw locally");
             }
@@ -188,7 +190,9 @@ impl LocalState {
                     "Draw event does not match current turn",
                 );
 
-                self.players[&seat]
+                self.players
+                    .get_mut(&seat)
+                    .unwrap()
                     .discard_tile(id)
                     .expect("Failed to discard locally");
             }
@@ -199,7 +203,10 @@ impl LocalState {
                 winning_call,
                 tile: id,
             } => {
-                let discard = self.players[&called_from]
+                let discard = self
+                    .players
+                    .get_mut(&called_from)
+                    .unwrap()
                     .call_last_discard()
                     .expect("Cannot call from a player with no discards");
 
@@ -209,7 +216,9 @@ impl LocalState {
                     discard, called_from, id,
                 );
 
-                self.players[&caller]
+                self.players
+                    .get_mut(&caller)
+                    .unwrap()
                     .call_tile(discard, winning_call)
                     .expect("Unable to call tile locally");
             }
@@ -319,12 +328,7 @@ impl LocalHand {
     pub fn call_tile(&mut self, discard: TileInstance, call: Call) {
         match self {
             LocalHand::Local(hand) => hand.call_tile(discard, call)?,
-            LocalHand::Remote(hand) => match call {
-                Call::Chii(_, _) => todo!(),
-                Call::Pon => todo!(),
-                Call::Kan => todo!(),
-                Call::Ron => todo!(),
-            },
+            LocalHand::Remote(hand) => hand.call_tile(discard, call)?,
         }
     }
 }
@@ -336,7 +340,7 @@ pub struct RemoteHand {
     // player's hand. The only information is that which would be visible to another
     // player, i.e. the number of hidden tiles and whether or not they have a current
     // draw.
-    pub tiles_in_hand: u8,
+    pub tiles: u8,
     pub has_current_draw: bool,
 
     // "Inactive" tiles, i.e. ones that are in open melds (or a closed kong) and cannot
@@ -351,4 +355,54 @@ pub struct RemoteHand {
 
     // The player's discard pile.
     pub discards: Vec<TileInstance>,
+}
+
+impl RemoteHand {
+    #[throws(anyhow::Error)]
+    pub fn call_tile(&mut self, discard: TileInstance, call: Call) {
+        match call {
+            Call::Chii(id_a, id_b) => {
+                let tile_a = tile::instance_by_id(id_a);
+                let tile_b = tile::instance_by_id(id_b);
+
+                ensure!(
+                    tile::is_chow(discard.tile, tile_a.tile, tile_b.tile),
+                    r#"Tiles specified in "chii" call do not form valid chow"#,
+                );
+
+                self.tiles -= 2;
+
+                self.open_chows.push([discard, tile_a, tile_b]);
+            }
+
+            Call::Pon(id_a, id_b) => {
+                let tile_a = tile::instance_by_id(id_a);
+                let tile_b = tile::instance_by_id(id_b);
+
+                ensure!(
+                    discard.tile == tile_a.tile && discard.tile == tile_b.tile,
+                    r#"Tiles specified in "pon" call do not form a valid pong"#,
+                );
+
+                self.tiles -= 2;
+
+                self.open_pongs.push([discard, tile_a, tile_b]);
+            }
+
+            Call::Kan(tile) => {
+                let tiles = tile::all_instances_of(tile);
+
+                self.tiles -= 3;
+
+                ensure!(
+                    tiles[0].tile == discard.tile,
+                    r#"Tile specified in "kan" call does not match the discarded tile"#,
+                );
+
+                self.open_kongs.push(tiles);
+            }
+
+            Call::Ron => todo!("Handle calling a ron"),
+        }
+    }
 }
