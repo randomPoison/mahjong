@@ -14,6 +14,8 @@ namespace Synapse.Mahjong
     /// </remarks>
     public class OutOfSyncException : Exception
     {
+        public OutOfSyncException() : base() { }
+
         public OutOfSyncException(string message) : base(message) { }
     }
 }

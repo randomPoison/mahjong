@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Synapse.Utils;
 using UniRx.Async;
@@ -77,7 +78,7 @@ namespace Synapse.Mahjong.Match
             }
         }
 
-        public void DrawTile(TileView tile)
+        public async UniTask DrawTile(TileView tile)
         {
             Debug.Assert(
                 _currentDraw == null,
@@ -89,6 +90,11 @@ namespace Synapse.Mahjong.Match
 
             tile.transform.SetParent(_drawTileAnchor, worldPositionStays: false);
             tile.transform.localPosition = Vector3.zero;
+
+            // TODO: Animate the draw action. This delay is just here as a placeholder
+            // to ensure the code handles the delay that will eventually be here once we
+            // implement an animation.
+            await UniTask.Delay(500);
         }
 
         public void MoveToDiscard(TileId id)
@@ -177,9 +183,14 @@ namespace Synapse.Mahjong.Match
             throw new NotImplementedException();
         }
 
-        public void DrawDummyTile()
+        public async UniTask DrawDummyTile()
         {
             throw new NotImplementedException();
+
+            // TODO: Animate the draw action. This delay is just here as a placeholder
+            // to ensure the code handles the delay that will eventually be here once we
+            // implement an animation.
+            await UniTask.Delay(500);
         }
 
         #endregion

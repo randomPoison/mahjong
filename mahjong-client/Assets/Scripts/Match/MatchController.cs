@@ -6,6 +6,7 @@ using System.Threading;
 using UniRx.Async;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using UnityEngine.SocialPlatforms;
 using UnityEngine.UI;
 
 namespace Synapse.Mahjong.Match
@@ -167,54 +168,49 @@ namespace Synapse.Mahjong.Match
                         throw new NotImplementedException($"Unhandled turn state: {turnState}");
                 }
 
-                // Wait to receive the next update from the server.
+                // Wait to receive the next update from the server and merge it in with the server
+                // state once received.
                 var eventJson = await _socket.RecvStringAsync(_cancellation.Token);
-
-                // Feed the incoming event into the server state.
-                IMatchEvent update = _serverState.HandleEvent(eventJson);
+                IMatchEvent update = _serverState.DeserializeAndHandleEvent(eventJson);
 
                 // Apply the received update to the local state, updating both the game
                 // state tracking and the visual state.
                 switch (update)
                 {
-                    case MatchEvent.TileDrawn draw:
+                    case MatchEvent.LocalDraw localDraw:
                     {
-                        // Update the game state tracking for the client.
-                        if (!_localState.TryDrawTile(draw.Seat, draw.Tile))
-                        {
-                            // TODO: Handle the client being out of sync with the server.
-                            throw new NotImplementedException("Client out of sync with server");
-                        }
-
-                        var localDraw = _localState.CurrentDraw(draw.Seat);
                         Debug.Assert(
-                            draw.Tile.Element0 == localDraw.Id.Element0,
-                            "Drew incorrect tile when simulating locally",
+                            localDraw.Seat == _seat,
+                            $"Seat for `LocalDraw` event was {localDraw.Seat}, but local seat is {_seat}",
                             this);
 
+                        // Update the game state tracking for the client.
+                        if (!_localState.TryDrawLocalTile(_seat, localDraw.Tile))
+                        {
+                            throw new OutOfSyncException(
+                                $"Unable to perform local draw of tile {localDraw.Tile}");
+                        }
+
+                        var currentDraw = _localState.LocalHand(_seat).GetCurrentDraw();
+
                         // Update the visuals based on the draw event.
-                        var hand = _hands[(int)draw.Seat];
-                        var tileObject = InstantiateTile(localDraw);
-                        hand.DrawTile(tileObject);
+                        var hand = _hands[(int)_seat];
+                        var tileObject = InstantiateTile(currentDraw);
+                        await hand.DrawTile(tileObject);
+                    }
+                    break;
 
-                        // TODO: Do some kind of actual animation for the draw.
-
-                        // If the local player was the one that drew the tile, have them discard a
-                        // tile now.
-                        if (draw.Seat == _seat)
+                    case MatchEvent.RemoteDraw remoteDraw:
+                    {
+                        if (!_localState.TryDrawRemoteTile(remoteDraw.Seat))
                         {
-                            Debug.Assert(
-                                _localState.CurrentTurn() == _seat,
-                                "Player drew a tile but it's not their turn???");
+                            throw new OutOfSyncException(
+                                $"Unable to perform draw for remote player {remoteDraw.Seat}");
+                        }
 
-                            await DiscardTile();
-                        }
-                        else
-                        {
-                            // TODO: Remove the explicit delay once we have an animation for the
-                            // draw.
-                            await UniTask.Delay((int)(_delayAfterDraw * 1000));
-                        }
+                        // Update the visuals based on the draw event.
+                        var hand = _hands[(int)remoteDraw.Seat];
+                        await hand.DrawDummyTile();
                     }
                     break;
 

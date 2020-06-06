@@ -273,6 +273,14 @@ impl LocalState {
             LocalHand::Local(_) => false,
         }
     }
+
+    pub fn try_discard_tile(&mut self, seat: Wind, tile: TileId) -> bool {
+        self.players
+            .get_mut(&seat)
+            .unwrap()
+            .discard_tile(tile)
+            .is_ok()
+    }
 }
 
 /// The turn information for `LocalState`.
