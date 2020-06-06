@@ -180,7 +180,7 @@ namespace Synapse.Mahjong.Match
                     case MatchEvent.TileDrawn draw:
                     {
                         // Update the game state tracking for the client.
-                        if (!_localState.TryDrawTile(draw.Seat))
+                        if (!_localState.TryDrawTile(draw.Seat, draw.Tile))
                         {
                             // TODO: Handle the client being out of sync with the server.
                             throw new NotImplementedException("Client out of sync with server");

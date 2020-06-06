@@ -111,13 +111,18 @@ pub struct DiscardTileRequest {
 #[cs_bindgen]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MatchEvent {
-    /// A player drew a tile.
-    TileDrawn {
+    /// The local player drew a tile.
+    LocalDraw {
         seat: Wind,
-
-        // TODO: Don't expose information about which tile the player drew. This is
-        // currently an avenue for exploits.
         tile: TileId,
+    },
+
+    /// One of the remote players drew a tile.
+    ///
+    /// The drawn tile is not specified to avoid exposing information about hidden tiles
+    /// in other players' hands.
+    RemoteDraw {
+        seat: Wind,
     },
 
     /// A player discarded a tile.

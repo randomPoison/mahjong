@@ -308,51 +308,6 @@ impl MatchState {
         });
         serde_json::to_string(&request).unwrap()
     }
-
-    // TODO: Make `json` a `&str` and return a `Result` here instead of panicking on
-    // errors. Both of these are pending support in cs-bindgen.
-    pub fn handle_event(&mut self, json: String) -> MatchEvent {
-        let event = serde_json::from_str(&json).unwrap();
-
-        // Apply the event to the local state.
-        match &event {
-            &MatchEvent::TileDrawn { seat, tile } => {
-                assert_eq!(
-                    self.turn_state,
-                    TurnState::AwaitingDraw(seat),
-                    "Draw event does not match current turn",
-                );
-
-                let draw = self.draw_for_player(seat).expect("Unable to draw locally");
-                assert_eq!(draw, tile, "Local draw does not match draw event");
-            }
-
-            &MatchEvent::TileDiscarded { seat, tile, .. } => {
-                assert_eq!(
-                    self.turn_state,
-                    TurnState::AwaitingDiscard(seat),
-                    "Draw event does not match current turn",
-                );
-
-                self.discard_tile(seat, tile)
-                    .expect("Failed to discard locally");
-            }
-
-            &MatchEvent::Call {
-                caller,
-                winning_call,
-                ..
-            } => {
-                self.call_tile(caller, Some(winning_call))
-                    .expect("Unable to call tile locally");
-            }
-
-            MatchEvent::MatchEnded => {}
-        }
-
-        // Forward the event to the host environment
-        event
-    }
 }
 
 /// Unique identifier for an active match.

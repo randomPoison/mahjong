@@ -4,7 +4,7 @@ use crate::{
     messages::*,
     tile::{self, TileId, TileInstance, Wind},
 };
-use anyhow::ensure;
+use anyhow::{ensure, Context};
 use cs_bindgen::prelude::*;
 use fehler::throws;
 use serde::{Deserialize, Serialize};
@@ -105,6 +105,86 @@ pub struct LocalState {
     pub turn_state: LocalTurnState,
 }
 
+impl LocalState {
+    #[throws(anyhow::Error)]
+    pub fn handle_event(&mut self, event: &MatchEvent) {
+        // Apply the event to the local state.
+        match event {
+            &MatchEvent::LocalDraw { seat, tile: id } => {
+                ensure!(
+                    self.turn_state == LocalTurnState::AwaitingDraw(seat),
+                    "Draw event does not match current turn",
+                );
+
+                ensure!(
+                    self.try_draw_local_tile(seat, id),
+                    "Failed to draw local tile, seat: {:?}, tile ID: {:?}",
+                    seat,
+                    id,
+                );
+            }
+
+            &MatchEvent::RemoteDraw { seat } => {
+                ensure!(
+                    self.turn_state == LocalTurnState::AwaitingDraw(seat),
+                    "Draw event does not match current turn",
+                );
+
+                ensure!(
+                    self.try_draw_remote_tile(seat),
+                    "Failed to draw remote tile, seat: {:?}",
+                    seat,
+                );
+            }
+
+            &MatchEvent::TileDiscarded { seat, tile: id, .. } => {
+                ensure!(
+                    self.turn_state == LocalTurnState::AwaitingDiscard(seat),
+                    "Draw event does not match current turn",
+                );
+
+                self.players
+                    .get_mut(&seat)
+                    .unwrap()
+                    .discard_tile(id)
+                    .with_context(|| {
+                        format!("Failed to discard tile locally for {:?} player", seat)
+                    })?;
+            }
+
+            &MatchEvent::Call {
+                called_from,
+                caller,
+                winning_call,
+                tile: id,
+            } => {
+                let discard = self
+                    .players
+                    .get_mut(&called_from)
+                    .unwrap()
+                    .call_last_discard()
+                    .expect("Cannot call from a player with no discards");
+
+                ensure!(
+                    id == discard.id,
+                    "Last discarded tile {:?} for {:?} player does not match expected discard {:?}",
+                    discard,
+                    called_from,
+                    id,
+                );
+
+                self.players
+                    .get_mut(&caller)
+                    .unwrap()
+                    .call_tile(discard, winning_call)
+                    .context("Failed to call tile locally")?;
+            }
+
+            MatchEvent::MatchEnded => {}
+        }
+    }
+}
+
 #[cs_bindgen]
 impl LocalState {
     pub fn id(&self) -> MatchId {
@@ -147,87 +227,51 @@ impl LocalState {
         }
     }
 
-    pub fn player_has_current_draw(&self, seat: Wind) -> bool {
-        match &self.players[&seat] {
-            LocalHand::Remote(hand) => hand.has_current_draw,
-            LocalHand::Local(hand) => hand.current_draw().is_some(),
-        }
-    }
-
     pub fn turn_state(&self) -> LocalTurnState {
         self.turn_state.clone()
     }
 
+    pub fn player_has_current_draw(&self, seat: Wind) -> bool {
+        match &self.players[&seat] {
+            LocalHand::Local(hand) => hand.current_draw().is_some(),
+            LocalHand::Remote(hand) => hand.has_current_draw,
+        }
+    }
+
+    /// Creates the request message for sending the discard action to the server.
+    pub fn request_discard_tile(&mut self, player: Wind, tile: TileId) -> String {
+        let request = ClientRequest::DiscardTile(DiscardTileRequest {
+            id: self.id,
+            player,
+            tile,
+        });
+        serde_json::to_string(&request).unwrap()
+    }
+
     // TODO: Make `json` a `&str` and return a `Result` here instead of panicking on
     // errors. Both of these are pending support in cs-bindgen.
-    //
-    // TODO: Once we're returning a `Result` here, replace the various usages of
-    // `assert!` with `ensure!` so that we're not panicking in the face of
-    // inconsistent data.
-    pub fn handle_event(&mut self, json: String) -> MatchEvent {
+    pub fn deserialize_and_handle_event(&mut self, json: String) -> MatchEvent {
         let event = serde_json::from_str(&json).unwrap();
-
-        // Apply the event to the local state.
-        match &event {
-            &MatchEvent::TileDrawn { seat, tile: id } => {
-                assert_eq!(
-                    self.turn_state,
-                    LocalTurnState::AwaitingDraw(seat),
-                    "Draw event does not match current turn",
-                );
-
-                self.players
-                    .get_mut(&seat)
-                    .unwrap()
-                    .draw_tile(id)
-                    .expect("Unable to draw locally");
-            }
-
-            &MatchEvent::TileDiscarded { seat, tile: id, .. } => {
-                assert_eq!(
-                    self.turn_state,
-                    LocalTurnState::AwaitingDiscard(seat),
-                    "Draw event does not match current turn",
-                );
-
-                self.players
-                    .get_mut(&seat)
-                    .unwrap()
-                    .discard_tile(id)
-                    .expect("Failed to discard locally");
-            }
-
-            &MatchEvent::Call {
-                called_from,
-                caller,
-                winning_call,
-                tile: id,
-            } => {
-                let discard = self
-                    .players
-                    .get_mut(&called_from)
-                    .unwrap()
-                    .call_last_discard()
-                    .expect("Cannot call from a player with no discards");
-
-                assert_eq!(
-                    id, discard.id,
-                    "Last discarded tile {:?} for {:?} player does not match expected discard {:?}",
-                    discard, called_from, id,
-                );
-
-                self.players
-                    .get_mut(&caller)
-                    .unwrap()
-                    .call_tile(discard, winning_call)
-                    .expect("Unable to call tile locally");
-            }
-
-            MatchEvent::MatchEnded => {}
-        }
-
-        // Forward the event to the host environment
+        self.handle_event(&event).unwrap();
         event
+    }
+
+    pub fn try_draw_local_tile(&mut self, seat: Wind, id: TileId) -> bool {
+        let tile = tile::instance_by_id(id);
+
+        assert_eq!(self.seat, seat, "The specified seat for the local player ({:?}) doesn't match the actual local seat ({:?})", seat, self.seat);
+
+        match self.players.get_mut(&seat).unwrap() {
+            LocalHand::Local(hand) => hand.draw_tile(tile).is_ok(),
+            LocalHand::Remote(_) => false,
+        }
+    }
+
+    pub fn try_draw_remote_tile(&mut self, seat: Wind) -> bool {
+        match self.players.get_mut(&seat).unwrap() {
+            LocalHand::Remote(hand) => hand.draw_tile().is_ok(),
+            LocalHand::Local(_) => false,
+        }
     }
 }
 
@@ -358,6 +402,16 @@ pub struct RemoteHand {
 }
 
 impl RemoteHand {
+    #[throws(anyhow::Error)]
+    pub fn draw_tile(&mut self) {
+        ensure!(
+            !self.has_current_draw,
+            "Cannot draw when hand already has a current draw",
+        );
+
+        self.has_current_draw = true;
+    }
+
     #[throws(anyhow::Error)]
     pub fn call_tile(&mut self, discard: TileInstance, call: Call) {
         match call {

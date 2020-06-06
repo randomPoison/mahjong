@@ -1,7 +1,12 @@
 use crate::client_controller::ClientControllerProxy;
 use mahjong::{
-    anyhow::*, client::LocalState, hand::Call, match_state::*, messages::MatchEvent,
-    strum::IntoEnumIterator, tile,
+    anyhow::*,
+    client::{LocalState, LocalTurnState},
+    hand::Call,
+    match_state::*,
+    messages::MatchEvent,
+    strum::IntoEnumIterator,
+    tile,
 };
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_pcg::*;
@@ -45,17 +50,27 @@ impl MatchController {
         }
     }
 
+    #[instrument(skip(self))]
     fn broadcast(&mut self, event: MatchEvent) {
-        trace!(
-            ?event,
-            "Broadcasting event to {} connected client(s)",
-            self.clients.len()
-        );
-
         for client in self.clients.values_mut() {
             client
                 .send_event(event.clone())
                 .expect("Disconnected from client controller");
+        }
+    }
+
+    #[instrument(skip(self))]
+    fn broadcast_draw(&mut self, seat: Wind, tile: TileId) {
+        for (&client_seat, client) in &mut self.clients {
+            let event = if client_seat == seat {
+                MatchEvent::LocalDraw { seat, tile }
+            } else {
+                MatchEvent::RemoteDraw { seat }
+            };
+
+            client
+                .send_event(event)
+                .expect("Failed to send message to client controller");
         }
     }
 }
@@ -130,10 +145,7 @@ impl MatchController {
                 });
 
                 let draw = self.state.draw_for_player(next_player)?;
-                self.broadcast(MatchEvent::TileDrawn {
-                    seat: next_player,
-                    tile: draw,
-                });
+                self.broadcast_draw(next_player, draw);
             }
 
             TurnState::MatchEnded { .. } => {
@@ -170,7 +182,7 @@ impl MatchController {
             self.clients.entry(seat).or_insert_with(|| {
                 let dummy = DummyClient {
                     seat,
-                    state: state.clone(),
+                    state: state.local_state_for_player(seat),
                     controller: remote.proxy(),
                 }
                 .spawn();
@@ -194,7 +206,7 @@ impl MatchController {
             .draw_for_player(seat)
             .expect("Failed to draw for first player");
 
-        self.broadcast(MatchEvent::TileDrawn { seat, tile });
+        self.broadcast_draw(seat, tile);
     }
 }
 
@@ -202,47 +214,37 @@ impl MatchController {
 #[derive(Debug, Actor)]
 struct DummyClient {
     seat: Wind,
-    state: MatchState,
+    state: LocalState,
     controller: MatchControllerProxy,
 }
 
 #[thespian::actor]
 impl DummyClient {
     fn send_event(&mut self, event: MatchEvent) {
-        match event {
-            MatchEvent::TileDrawn { seat, tile } => {
-                let draw = self.state.draw_for_player(seat).unwrap();
-                assert_eq!(tile, draw);
+        // Apply the event to the local state.
+        self.state.handle_event(&event).unwrap();
 
-                // If the player we control drew the tile, select a tile to discard.
+        // If the player we control can take an action now, make that action now.
+        match &self.state.turn_state {
+            &LocalTurnState::AwaitingDiscard(seat) => {
                 if seat == self.seat {
-                    let _ = self
-                        .controller
-                        .discard_tile(self.seat, self.state.player(self.seat).tiles()[0].id)
-                        .unwrap();
+                    let discard = self.state.local_hand(seat).tiles()[0].id;
+                    let _ = self.controller.discard_tile(self.seat, discard).unwrap();
                 }
             }
 
-            MatchEvent::TileDiscarded { seat, tile, calls } => {
-                self.state.discard_tile(seat, tile).unwrap();
-
+            LocalTurnState::AwaitingCalls { calls, .. } => {
                 if !calls.is_empty() {
                     let _ = self
                         .controller
-                        .call_tile(self.seat, Some(calls[0].clone()))
+                        .call_tile(self.seat, Some(calls[0]))
                         .unwrap();
                 }
             }
 
-            MatchEvent::Call {
-                caller,
-                winning_call,
-                ..
-            } => {
-                self.state.call_tile(caller, Some(winning_call)).unwrap();
-            }
-
-            MatchEvent::MatchEnded => todo!("Figure out how to shut down actors?"),
+            // No actions to be taken for the remaining state.
+            LocalTurnState::MatchEnded { .. } => {}
+            LocalTurnState::AwaitingDraw(_) => {}
         }
     }
 }
