@@ -33,6 +33,7 @@ namespace Synapse.Mahjong.Match
         [SerializeField] private AssetReferenceGameObject[] _characterTiles = default;
         [SerializeField] private AssetReferenceGameObject[] _dragonTiles = default;
         [SerializeField] private AssetReferenceGameObject[] _windTiles = default;
+        [SerializeField] private AssetReferenceGameObject _dummyTile = default;
 
         [Header("UI Elements")]
         [SerializeField] private GameObject _matchEndedDisplayRoot = default;
@@ -69,6 +70,7 @@ namespace Synapse.Mahjong.Match
         private GameObject[] _characterPrefabs = new GameObject[9];
         private GameObject[] _dragonPrefabs = new GameObject[3];
         private GameObject[] _windPrefabs = new GameObject[4];
+        private GameObject _dummyPrefab = null;
 
         // Root cancellation source for any tasks spawned by the controller, used to
         // cancel all pending tasks if we abruptly exit the match screen.
@@ -114,16 +116,16 @@ namespace Synapse.Mahjong.Match
                     if (handState.HasCurrentDraw())
                     {
                         var currentDraw = handState.GetCurrentDraw();
-                        hand.DrawTile(InstantiateTile(currentDraw));
+                        await hand.DrawTile(InstantiateTile(currentDraw));
                     }
                 }
                 else
                 {
-                    hand.FillWithDummyTiles();
+                    hand.FillWithDummyTiles(_dummyPrefab);
 
                     if (_localState.PlayerHasCurrentDraw(seat))
                     {
-                        hand.DrawDummyTile();
+                        await hand.DrawDummyTile();
                     }
                 }
 
@@ -442,6 +444,11 @@ namespace Synapse.Mahjong.Match
                     cancellation));
             }
 
+            tasks.Add(LoadSingleAsset(
+                _dummyTile,
+                prefab => { _dummyPrefab = prefab; },
+                cancellation));
+
             // Wait for all of the load operations to complete.
             await UniTask.WhenAll(tasks.ToArray());
 
@@ -461,6 +468,9 @@ namespace Synapse.Mahjong.Match
             Debug.Assert(
                 _windPrefabs.All(prefab => prefab != null),
                 "Not all wind tile prefabs loaded");
+            Debug.Assert(
+                _dummyPrefab != null,
+                "Dummy tile prefab not loaded");
 
             // Helper method for loading a single asset and performing some processing
             // operation (in this case adding it to the appropriate prefab list) once

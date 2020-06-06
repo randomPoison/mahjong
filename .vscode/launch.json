@@ -1,0 +1,29 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(Windows) Launch",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/mahjong-server.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceRoot}/mahjong-server",
+            "environment": [],
+            "externalConsole": true,
+            "preLaunchTask": "${defaultBuildTask}",
+        },
+        {
+            "name": "(OSX) Launch",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/mahjong-server",
+            "args": [],
+            "cwd": "${workspaceRoot}",
+            "preLaunchTask": "${defaultBuildTask}",
+        }
+    ]
+}

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Synapse.Utils;
@@ -38,6 +39,9 @@ namespace Synapse.Mahjong.Match
         private TileView _currentDraw = null;
         private List<TileView> _discards = new List<TileView>();
 
+        private List<GameObject> _dummyTiles = new List<GameObject>();
+        private GameObject _dummyCurrentDraw = null;
+
         #endregion
 
         #region Events
@@ -67,15 +71,7 @@ namespace Synapse.Mahjong.Match
             // player's hand.
             tile.transform.SetParent(_handRoot, worldPositionStays: false);
 
-            // Re-layout the updated set of tiles in the player's hand.
-            var leftSide = _tiles.Count * -TileWidth * 0.5f;
-            foreach (var (index, tileObj) in _tiles.Enumerate())
-            {
-                tileObj.transform.localPosition = new Vector3(
-                    leftSide + TileWidth * index,
-                    0f,
-                    0f);
-            }
+            LayoutHand(_tiles.Select(view => view.gameObject));
         }
 
         public async UniTask DrawTile(TileView tile)
@@ -178,9 +174,14 @@ namespace Synapse.Mahjong.Match
 
         #region Remote hand
 
-        public void FillWithDummyTiles()
+        public void FillWithDummyTiles(GameObject prefab)
         {
-            throw new NotImplementedException();
+            for (var count = 0; count < 13; count += 1)
+            {
+                _dummyTiles.Add(Instantiate(prefab, _handRoot));
+            }
+
+            LayoutHand(_dummyTiles);
         }
 
         public async UniTask DrawDummyTile()
@@ -191,6 +192,22 @@ namespace Synapse.Mahjong.Match
             // to ensure the code handles the delay that will eventually be here once we
             // implement an animation.
             await UniTask.Delay(500);
+        }
+
+        #endregion
+
+        #region Layout Logic
+
+        private void LayoutHand(IEnumerable<GameObject> tiles)
+        {
+            var leftSide = tiles.Count() * -TileWidth * 0.5f;
+            foreach (var (index, tileObj) in tiles.Enumerate())
+            {
+                tileObj.transform.localPosition = new Vector3(
+                    leftSide + TileWidth * index,
+                    0f,
+                    0f);
+            }
         }
 
         #endregion

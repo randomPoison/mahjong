@@ -804,8 +804,13 @@ MonoBehaviour:
     m_SubObjectName: 
   - m_AssetGUID: df9aa0d5c7fcf7241adfc5251f114b29
     m_SubObjectName: 
+  _dummyTile:
+    m_AssetGUID: 699632b757a767e4cbc52f8a894e1047
+    m_SubObjectName: 
   _matchEndedDisplayRoot: {fileID: 669952801}
   _exitButton: {fileID: 2124905087}
+  _delayAfterDraw: 1
+  _delayAfterDiscard: 1
 --- !u!4 &779160969
 Transform:
   m_ObjectHideFlags: 0

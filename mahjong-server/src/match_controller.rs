@@ -36,14 +36,9 @@ impl MatchController {
         let mut tiles = tile::TILE_SET.clone();
         tiles.shuffle(&mut rng);
 
-        let mut state = MatchState::new(id, tiles);
-
-        // For the east player, have them draw the tile for their first turn.
-        state.draw_for_player(Wind::East).unwrap();
-
         Self {
             rng,
-            state,
+            state: MatchState::new(id, tiles),
             clients: Default::default(),
             num_players,
             remote,
@@ -77,7 +72,10 @@ impl MatchController {
 
 #[thespian::actor]
 impl MatchController {
+    #[tracing::instrument(skip(self, controller))]
     pub fn join(&mut self, controller: ClientControllerProxy, seat: Wind) -> Result<LocalState> {
+        info!(?seat, "Player joining match");
+
         if self.clients.contains_key(&seat) {
             bail!("Seat is already occupied");
         }
@@ -91,6 +89,8 @@ impl MatchController {
         // the match start logic here because we want to make sure we send the initial match
         // state to the joining client before we broadcast any state updates.
         if self.clients.len() as u8 == self.num_players {
+            info!("All players have joined match, triggering match start");
+
             self.remote
                 .proxy()
                 .start_match()
@@ -167,11 +167,15 @@ impl MatchController {
 
     #[tracing::instrument(skip(self))]
     pub fn call_tile(&mut self, player: Wind, call: Option<Call>) -> Result<()> {
-        todo!()
+        trace!("Attempting to make call");
+
+        todo!("Implement calling")
     }
 
     #[tracing::instrument(skip(self))]
     fn start_match(&mut self) {
+        info!("Starting match");
+
         for seat in Wind::iter() {
             // NOTE: We need to manually split the borrows of `self.state` and `self.remote`
             // here because closures can't capture disjoint fields currently. This can be
