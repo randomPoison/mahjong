@@ -410,7 +410,7 @@ impl HandState {
 /// that kan has higher priority than pon, and pon has higher priority than chii.
 /// All chii calls have the same priority regardless of the sequence being made.
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Call {
     /// A "chii" call, making a chow meld (i.e. three tiles in a sequence).
     ///

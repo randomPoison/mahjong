@@ -3,6 +3,7 @@ use derive_more::*;
 use lazy_static::lazy_static;
 use num_traits::{ops::wrapping::WrappingAdd, One, PrimInt};
 use serde::*;
+use std::fmt::Debug;
 use strum::*;
 
 #[cs_bindgen]
@@ -193,8 +194,20 @@ impl Dragon {
 /// [`Tile`]: struct.Tile.html
 /// [`by_id`]: fn.by_id.html
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct TileId(u8);
+
+// Custom debug representation for `TileId` that includes the value of the tile.
+// This helps with debugging, since it's difficult to determine the value of a tile
+// by its ID alone.
+impl Debug for TileId {
+    fn fmt(&self, f: &mut export::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TileId")
+            .field("id", &self.0)
+            .field("value", &by_id(*self))
+            .finish()
+    }
+}
 
 /// An instance of a tile within a player's hand during a match.
 ///

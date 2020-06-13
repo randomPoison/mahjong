@@ -262,24 +262,50 @@ impl LocalState {
         assert_eq!(self.seat, seat, "The specified seat for the local player ({:?}) doesn't match the actual local seat ({:?})", seat, self.seat);
 
         match self.players.get_mut(&seat).unwrap() {
-            LocalHand::Local(hand) => hand.draw_tile(tile).is_ok(),
-            LocalHand::Remote(_) => false,
-        }
+            LocalHand::Local(hand) => hand.draw_tile(tile).unwrap(),
+            LocalHand::Remote(_) => return false,
+        };
+
+        self.turn_state = LocalTurnState::AwaitingDiscard(seat);
+
+        true
     }
 
     pub fn try_draw_remote_tile(&mut self, seat: Wind) -> bool {
         match self.players.get_mut(&seat).unwrap() {
-            LocalHand::Remote(hand) => hand.draw_tile().is_ok(),
-            LocalHand::Local(_) => false,
+            LocalHand::Remote(hand) => hand.draw_tile().unwrap(),
+            LocalHand::Local(_) => return false,
         }
+
+        self.turn_state = LocalTurnState::AwaitingDiscard(seat);
+
+        true
     }
 
-    pub fn try_discard_tile(&mut self, seat: Wind, tile: TileId) -> bool {
+    pub fn try_discard_tile(&mut self, discarding_player: Wind, discard: TileId) -> bool {
         self.players
-            .get_mut(&seat)
+            .get_mut(&discarding_player)
             .unwrap()
-            .discard_tile(tile)
-            .is_ok()
+            .discard_tile(discard)
+            .unwrap();
+
+        // If the local player can call the discarded tile, update the turn state to
+        // `AwaitingCalls`, otherwise wait for the next player to draw.
+        let calls = self.players[&self.seat]
+            .as_local()
+            .unwrap()
+            .find_possible_calls(tile::by_id(discard), discarding_player.next() == self.seat);
+        if discarding_player != self.seat && !calls.is_empty() {
+            self.turn_state = LocalTurnState::AwaitingCalls {
+                calls,
+                discarding_player,
+                discard,
+            };
+        } else {
+            self.turn_state = LocalTurnState::AwaitingDraw(discarding_player.next());
+        }
+
+        true
     }
 }
 
@@ -307,7 +333,7 @@ pub enum LocalTurnState {
 }
 
 // TODO: This should go in a `Mahjong.Match` namespace.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LocalHand {
     /// The hand for the player controlled by the client. Contains the full state
     /// information for the hand.
@@ -319,6 +345,13 @@ pub enum LocalHand {
 }
 
 impl LocalHand {
+    pub fn as_local(&self) -> Option<&HandState> {
+        match self {
+            LocalHand::Local(hand) => Some(hand),
+            _ => None,
+        }
+    }
+
     #[throws(anyhow::Error)]
     pub fn draw_tile(&mut self, id: TileId) {
         match self {
