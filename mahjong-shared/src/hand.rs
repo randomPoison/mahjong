@@ -7,7 +7,7 @@ use cs_bindgen::prelude::*;
 use fehler::{throw, throws};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, collections::HashSet};
+use std::cmp::Ordering;
 use take_if::TakeIf;
 use thiserror::Error;
 use tile::Wind;
@@ -139,23 +139,49 @@ impl HandState {
         let mut calls = Vec::new();
 
         if can_call_chii {
-            // We gather the found calls in an intermediate hash set in order so that if there's
-            // multiple ways the form the same call we only return one instance.
-            let mut chii_calls = HashSet::new();
+            let mut chii_calls = Vec::new();
 
             // Iterate over all combinations of 2 tiles from the hand and check to see if those
             // tiles can form chow with the discarded tile.
             for (first, second) in self.tiles.iter().tuple_combinations() {
                 if tile::is_chow(discard, first.tile, second.tile) {
-                    chii_calls.insert(TilePair(first, second));
+                    chii_calls.push((first, second));
                 }
             }
+
+            // Remove duplicate calls that are made of the same tile values. Since there are
+            // multiple copies of each tile, it's possible that a player may have multiple tiles
+            // that can complete the same chii call. We remove the duplicate calls since they
+            // would appear to be the same to players.
+            //
+            // NOTE: We must sort the list based on the tile value before deduplicating because
+            // `Vec::dedup` only removes *consecutive* repeated elements. When we do so, we must
+            // take care to provide a consistent ordering for the pairs such that all pairs with
+            // the same tile values will appear consecutively. As such, when specifying the key
+            // to use for sorting the tiles we always list the lower tile value first regardless
+            // of the order of the tiles within each pair.
+            chii_calls.sort_by_key(|(first, second)| {
+                if first.tile < second.tile {
+                    (first.tile, second.tile)
+                } else {
+                    (second.tile, first.tile)
+                }
+            });
+            chii_calls.dedup_by_key(|pair| (pair.0.tile, pair.1.tile));
+
+            // Once we have deduplicated the list of calls, we re-sort the list based on the IDs
+            // of the tiles in each pair. This is to ensure determinism in how we order the
+            // returned pairs, such that the same hand with tiles in the same order will always
+            // return the same set of calls in the same order. This property is useful mainly
+            // for tests, since it allows us to directly compare the generated lists of calls
+            // without needing to check if the lists are logically the same.
+            chii_calls.sort_by_key(|pair| (pair.0.id, pair.1.id));
 
             // Convert the set of tile pairs into the list of `Chii` calls.
             calls.extend(
                 chii_calls
                     .into_iter()
-                    .map(|TilePair(first, second)| Call::Chii(first.id, second.id)),
+                    .map(|pair| Call::Chii(pair.0.id, pair.1.id)),
             );
         }
 
@@ -502,21 +528,6 @@ pub enum DiscardError {
 
     #[error("Tile is not in the player's hand, or is in an open meld and so cannot be discarded")]
     NotInHand,
-}
-
-/// Helper for de-duplicating chii calls.
-///
-/// Implements a custom equality comparison that ignores the tile IDs and ignores
-/// the order that the tiles are specified in. This allows us to only return a
-/// single "instance" of a given call when finding the possible calls for a discard.
-#[derive(Debug, Clone, Copy, Eq, Hash)]
-struct TilePair<'a>(&'a TileInstance, &'a TileInstance);
-
-impl PartialEq for TilePair<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        (self.0.tile == other.0.tile && self.1.tile == other.1.tile)
-            || (self.0.tile == other.1.tile && self.1.tile == other.0.tile)
-    }
 }
 
 #[cfg(test)]
