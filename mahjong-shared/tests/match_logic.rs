@@ -73,10 +73,16 @@ fn discard_from_hand() {
             let waiting = waiting.clone();
             for &seat in waiting.keys() {
                 state.call_tile(seat, None).unwrap();
+                local_states
+                    .get_mut(&seat)
+                    .unwrap()
+                    .make_call(None)
+                    .unwrap();
             }
 
-            state.decide_call().unwrap();
+            assert_eq!(None, state.decide_call().unwrap());
         }
+        assert_state_sync(&state, &local_states);
 
         current_player = current_player.next();
     }

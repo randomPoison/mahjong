@@ -4,7 +4,7 @@ use crate::{
     messages::*,
     tile::{self, TileId, TileInstance, Wind},
 };
-use anyhow::{ensure, Context};
+use anyhow::{bail, ensure, Context};
 use cs_bindgen::prelude::*;
 use fehler::throws;
 use serde::{Deserialize, Serialize};
@@ -183,6 +183,58 @@ impl LocalState {
             MatchEvent::MatchEnded => {}
         }
     }
+
+    #[throws(anyhow::Error)]
+    pub fn make_call(&mut self, call: Option<Call>) {
+        let (calls, &discard_id, &discarding_player) = match &self.turn_state {
+            LocalTurnState::AwaitingCalls {
+                calls,
+                discard,
+                discarding_player,
+            } => (calls, discard, discarding_player),
+
+            _ => bail!(
+                "Call {:?} is not valid for current turn state {:?}",
+                call,
+                self.turn_state,
+            ),
+        };
+
+        match call {
+            Some(call) => {
+                ensure!(
+                    calls.contains(&call),
+                    "Specified call {:?} was not in list of valid calls {:?}",
+                    call,
+                    calls,
+                );
+
+                let discarding_player = self.players.get_mut(&discarding_player).unwrap();
+
+                // Sanity check that the discarded tile we have locally matches the tile that the
+                // server said was discarded.
+                let last_discard = discarding_player.last_discard();
+                ensure!(
+                    Some(discard_id) == last_discard,
+                    "Unexpected value for last discarded tile, expected {:?} but found {:?}",
+                    discard_id,
+                    last_discard,
+                );
+
+                // Remove the tile from the player's discards and add it to the calling player's
+                // hand.
+                let discard = discarding_player.call_last_discard().unwrap();
+                let hand = self.players.get_mut(&self.seat).unwrap();
+                hand.call_tile(discard, call)?;
+            }
+
+            // Player is passing instead of calling, so skip the turn state ahead to wait for
+            // the next player to draw.
+            None => {
+                self.turn_state = LocalTurnState::AwaitingDraw(discarding_player.next());
+            }
+        }
+    }
 }
 
 #[cs_bindgen]
@@ -256,10 +308,24 @@ impl LocalState {
         event
     }
 
+    // TODO: Have all of the state mutation methods return a `Result` once cs-bindgen
+    // supports doing so. For now we're stuck returning a bool to indicate if the
+    // operation succeeded or not.
+
     pub fn try_draw_local_tile(&mut self, seat: Wind, id: TileId) -> bool {
         let tile = tile::instance_by_id(id);
 
-        assert_eq!(self.seat, seat, "The specified seat for the local player ({:?}) doesn't match the actual local seat ({:?})", seat, self.seat);
+        assert_eq!(
+            self.seat,
+            seat,
+            "The specified seat for the local player ({:?}) doesn't match the actual local seat ({:?})",
+            seat,
+            self.seat,
+        );
+
+        if self.turn_state != LocalTurnState::AwaitingDraw(seat) {
+            return false;
+        }
 
         match self.players.get_mut(&seat).unwrap() {
             LocalHand::Local(hand) => hand.draw_tile(tile).unwrap(),
@@ -272,6 +338,10 @@ impl LocalState {
     }
 
     pub fn try_draw_remote_tile(&mut self, seat: Wind) -> bool {
+        if self.turn_state != LocalTurnState::AwaitingDraw(seat) {
+            return false;
+        }
+
         match self.players.get_mut(&seat).unwrap() {
             LocalHand::Remote(hand) => hand.draw_tile().unwrap(),
             LocalHand::Local(_) => return false,
@@ -306,6 +376,14 @@ impl LocalState {
         }
 
         true
+    }
+
+    pub fn try_pass_call(&mut self) -> bool {
+        self.make_call(None).is_ok()
+    }
+
+    pub fn try_make_call(&mut self, call: Call) -> bool {
+        self.make_call(Some(call)).is_ok()
     }
 }
 
@@ -398,6 +476,13 @@ impl LocalHand {
                 hand.has_current_draw = false;
                 hand.discards.push(instance);
             }
+        }
+    }
+
+    pub fn last_discard(&self) -> Option<TileId> {
+        match self {
+            LocalHand::Local(hand) => hand.discards().last().map(|instance| instance.id),
+            LocalHand::Remote(hand) => hand.discards.last().map(|instance| instance.id),
         }
     }
 
