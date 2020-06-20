@@ -101,9 +101,13 @@ impl MatchController {
     }
 
     /// Returns the updated match state if the requested discard is valid.
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, player, tile))]
     pub fn discard_tile(&mut self, player: Wind, tile: TileId) -> Result<()> {
-        trace!("Attempting to discard tile");
+        trace!(
+            "Attempting to discard tile {:?} for player {:?}",
+            tile,
+            player,
+        );
 
         // TODO: Provide more robust state transitions such that it's not possible to get
         // this far after the match has ended, e.g. a `MatchControllerState` enum that has

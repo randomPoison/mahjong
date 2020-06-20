@@ -10,7 +10,7 @@ use warp::Filter;
 mod client_controller;
 mod match_controller;
 
-#[tokio::main]
+#[tokio::main(max_threads = 1)]
 async fn main() {
     // Setup the global logger.
     let subscriber = tracing_subscriber::FmtSubscriber::builder()

@@ -233,17 +233,17 @@ dependencies = [
 [[package]]
 name = "cs-bindgen"
 version = "0.1.0"
-source = "git+https://github.com/randomPoison/cs-bindgen?rev=b90dba1#b90dba194d3633ea1a34049e6ada7e6a9d83d1d7"
+source = "git+https://github.com/randomPoison/cs-bindgen?rev=d9b46b3#d9b46b366ccb1cf10474067324c934c486a0b38d"
 dependencies = [
- "cs-bindgen-macro 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=b90dba1)",
- "cs-bindgen-shared 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=b90dba1)",
+ "cs-bindgen-macro 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=d9b46b3)",
+ "cs-bindgen-shared 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=d9b46b3)",
  "strum 0.17.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "cs-bindgen-macro"
 version = "0.1.0"
-source = "git+https://github.com/randomPoison/cs-bindgen?rev=b90dba1#b90dba194d3633ea1a34049e6ada7e6a9d83d1d7"
+source = "git+https://github.com/randomPoison/cs-bindgen?rev=d9b46b3#d9b46b366ccb1cf10474067324c934c486a0b38d"
 dependencies = [
  "proc-macro2 1.0.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "quote 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -255,7 +255,7 @@ dependencies = [
 [[package]]
 name = "cs-bindgen-shared"
 version = "0.1.0"
-source = "git+https://github.com/randomPoison/cs-bindgen?rev=b90dba1#b90dba194d3633ea1a34049e6ada7e6a9d83d1d7"
+source = "git+https://github.com/randomPoison/cs-bindgen?rev=d9b46b3#d9b46b366ccb1cf10474067324c934c486a0b38d"
 dependencies = [
  "derive_more 0.99.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "schematic 0.1.0 (git+https://github.com/randomPoison/schematic?rev=ef03b33)",
@@ -704,7 +704,7 @@ name = "mahjong"
 version = "0.1.0"
 dependencies = [
  "anyhow 1.0.31 (registry+https://github.com/rust-lang/crates.io-index)",
- "cs-bindgen 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=b90dba1)",
+ "cs-bindgen 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=d9b46b3)",
  "derive_more 0.99.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "fehler 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "itertools 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2058,9 +2058,9 @@ dependencies = [
 "checksum crossbeam-epoch 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "058ed274caafc1f60c4997b5fc07bf7dc7cca454af7c6e81edffe5f33f70dace"
 "checksum crossbeam-queue 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c695eeca1e7173472a32221542ae469b3e9aac3a4fc81f7696bcad82029493db"
 "checksum crossbeam-utils 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)" = "c3c7c73a2d1e9fc0886a08b93e98eb643461230d5f1925e4036204d5f2e261a8"
-"checksum cs-bindgen 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=b90dba1)" = "<none>"
-"checksum cs-bindgen-macro 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=b90dba1)" = "<none>"
-"checksum cs-bindgen-shared 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=b90dba1)" = "<none>"
+"checksum cs-bindgen 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=d9b46b3)" = "<none>"
+"checksum cs-bindgen-macro 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=d9b46b3)" = "<none>"
+"checksum cs-bindgen-shared 0.1.0 (git+https://github.com/randomPoison/cs-bindgen?rev=d9b46b3)" = "<none>"
 "checksum ctor 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)" = "cf6b25ee9ac1995c54d7adb2eff8cfffb7260bc774fb63c601ec65467f43cd9d"
 "checksum derivative 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "3c6d883546668a3e2011b6a716a7330b82eabb0151b138217f632c8243e17135"
 "checksum derivative 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "cb582b60359da160a9477ee80f15c8d784c477e69c217ef2cdd4169c24ea380f"

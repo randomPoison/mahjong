@@ -113,7 +113,9 @@ impl LocalState {
             &MatchEvent::LocalDraw { seat, tile: id } => {
                 ensure!(
                     self.turn_state == LocalTurnState::AwaitingDraw(seat),
-                    "Draw event does not match current turn",
+                    "Draw event {:?} does not match current turn {:?}",
+                    event,
+                    self.turn_state,
                 );
 
                 ensure!(
@@ -127,7 +129,9 @@ impl LocalState {
             &MatchEvent::RemoteDraw { seat } => {
                 ensure!(
                     self.turn_state == LocalTurnState::AwaitingDraw(seat),
-                    "Draw event does not match current turn",
+                    "Draw event {:?} does not match current turn {:?}",
+                    event,
+                    self.turn_state,
                 );
 
                 ensure!(
@@ -140,7 +144,9 @@ impl LocalState {
             &MatchEvent::TileDiscarded { seat, tile: id, .. } => {
                 ensure!(
                     self.turn_state == LocalTurnState::AwaitingDiscard(seat),
-                    "Draw event does not match current turn",
+                    "Draw {:?} event does not match current turn {:?}",
+                    event,
+                    self.turn_state,
                 );
 
                 self.players

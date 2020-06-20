@@ -133,7 +133,7 @@ impl ClientController {
         };
 
         let request = serde_json::from_str::<ClientRequest>(text)?;
-        info!(?request, "Handling incoming request");
+        info!("Handling incoming request: {:?}", request);
 
         match request {
             ClientRequest::StartMatch => {
