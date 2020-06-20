@@ -36,9 +36,9 @@ fn discard_from_hand() {
             let local_state = local_states.get_mut(&seat).unwrap();
 
             if seat == current_player {
-                assert!(local_state.try_draw_local_tile(current_player, draw));
+                local_state.draw_local_tile(draw).unwrap();
             } else {
-                assert!(local_state.try_draw_remote_tile(current_player));
+                local_state.draw_remote_tile(current_player).unwrap();
             }
         }
         assert_state_sync(&state, &local_states);
@@ -48,7 +48,7 @@ fn discard_from_hand() {
         state.discard_tile(current_player, discard).unwrap();
         for seat in Wind::iter() {
             let local_state = local_states.get_mut(&seat).unwrap();
-            assert!(local_state.try_discard_tile(current_player, discard));
+            local_state.discard_tile(current_player, discard).unwrap();
         }
         assert_state_sync(&state, &local_states);
 

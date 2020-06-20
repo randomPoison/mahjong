@@ -45,8 +45,9 @@ impl MatchController {
         }
     }
 
-    #[instrument(skip(self))]
     fn broadcast(&mut self, event: MatchEvent) {
+        trace!("Broadcasting event to all clients: {:?}", event);
+
         for client in self.clients.values_mut() {
             client
                 .send_event(event.clone())
@@ -127,6 +128,8 @@ impl MatchController {
             // If any players can call the discarded tile, include the list of possible calls
             // when notifying them of the discard.
             TurnState::AwaitingCalls { waiting, .. } => {
+                trace!("Awaiting calls after discard: {:?}", waiting);
+
                 for seat in Wind::iter() {
                     let calls = waiting.get(&seat).cloned().unwrap_or_default();
                     self.clients
@@ -142,6 +145,8 @@ impl MatchController {
             }
 
             &TurnState::AwaitingDraw(next_player) => {
+                trace!("Awaiting for next player to draw ({:?})", next_player);
+
                 self.broadcast(MatchEvent::TileDiscarded {
                     seat: player,
                     tile,
@@ -153,6 +158,8 @@ impl MatchController {
             }
 
             TurnState::MatchEnded { .. } => {
+                trace!("Match ended after discard");
+
                 self.broadcast(MatchEvent::TileDiscarded {
                     seat: player,
                     tile,
@@ -228,7 +235,14 @@ struct DummyClient {
 
 #[thespian::actor]
 impl DummyClient {
+    #[instrument(skip(self, event))]
     fn send_event(&mut self, event: MatchEvent) {
+        trace!(
+            "Dummy client {:?} handling match event: {:?}",
+            self.seat,
+            event,
+        );
+
         // Apply the event to the local state.
         self.state.handle_event(&event).unwrap();
 

@@ -112,50 +112,30 @@ impl LocalState {
         match event {
             &MatchEvent::LocalDraw { seat, tile: id } => {
                 ensure!(
-                    self.turn_state == LocalTurnState::AwaitingDraw(seat),
-                    "Draw event {:?} does not match current turn {:?}",
-                    event,
-                    self.turn_state,
+                    seat == self.seat,
+                    "Seat specified for local draw ({:?}) doesn't match local seat for client ({:?})",
+                    seat,
+                    self.seat,
                 );
 
-                ensure!(
-                    self.try_draw_local_tile(seat, id),
-                    "Failed to draw local tile, seat: {:?}, tile ID: {:?}",
-                    seat,
-                    id,
-                );
+                self.draw_local_tile(id)?;
             }
 
             &MatchEvent::RemoteDraw { seat } => {
                 ensure!(
-                    self.turn_state == LocalTurnState::AwaitingDraw(seat),
-                    "Draw event {:?} does not match current turn {:?}",
-                    event,
-                    self.turn_state,
+                    seat != self.seat,
+                    "Seat specified for remote draw matches local seat ({:?})",
+                    self.seat,
                 );
 
-                ensure!(
-                    self.try_draw_remote_tile(seat),
-                    "Failed to draw remote tile, seat: {:?}",
-                    seat,
-                );
+                self.draw_remote_tile(seat)?;
             }
 
+            // TODO: It seems suspect that we're ignoring some of the fields here, probably
+            // worth reviewing what fields we're ignoring and seeing if there's a better
+            // approach to take.
             &MatchEvent::TileDiscarded { seat, tile: id, .. } => {
-                ensure!(
-                    self.turn_state == LocalTurnState::AwaitingDiscard(seat),
-                    "Draw {:?} event does not match current turn {:?}",
-                    event,
-                    self.turn_state,
-                );
-
-                self.players
-                    .get_mut(&seat)
-                    .unwrap()
-                    .discard_tile(id)
-                    .with_context(|| {
-                        format!("Failed to discard tile locally for {:?} player", seat)
-                    })?;
+                self.discard_tile(seat, id)?;
             }
 
             &MatchEvent::Call {
@@ -241,6 +221,84 @@ impl LocalState {
             }
         }
     }
+
+    #[throws(anyhow::Error)]
+    pub fn draw_local_tile(&mut self, draw_id: TileId) {
+        ensure!(
+            self.turn_state == LocalTurnState::AwaitingDraw(self.seat),
+            "Local draw is not valid for current turn state {:?}, drawn tile: {:?}",
+            self.turn_state,
+            draw_id,
+        );
+
+        let tile = tile::instance_by_id(draw_id);
+
+        self.players
+            .get_mut(&self.seat)
+            .unwrap()
+            .as_local_mut()
+            .unwrap()
+            .draw_tile(tile)?;
+
+        self.turn_state = LocalTurnState::AwaitingDiscard(self.seat);
+    }
+
+    #[throws(anyhow::Error)]
+    pub fn draw_remote_tile(&mut self, seat: Wind) {
+        ensure!(
+            self.turn_state == LocalTurnState::AwaitingDraw(seat),
+            "Remote draw is not valid for current turn state {:?}, drawing player: {:?}",
+            self.turn_state,
+            seat,
+        );
+
+        self.players
+            .get_mut(&seat)
+            .unwrap()
+            .as_remote_mut()
+            .unwrap()
+            .draw_tile()?;
+
+        self.turn_state = LocalTurnState::AwaitingDiscard(seat);
+    }
+
+    #[throws(anyhow::Error)]
+    pub fn discard_tile(&mut self, discarding_player: Wind, discard: TileId) {
+        ensure!(
+            self.turn_state == LocalTurnState::AwaitingDiscard(discarding_player),
+            "Discard is not valid for turn state {:?}, discarding_player: {:?}, discard: {:?}",
+            self.turn_state,
+            discarding_player,
+            discard,
+        );
+
+        self.players
+            .get_mut(&discarding_player)
+            .unwrap()
+            .discard_tile(discard)
+            .with_context(|| {
+                format!(
+                    "Failed to discard tile locally for {:?} player",
+                    discarding_player
+                )
+            })?;
+
+        // If the local player can call the discarded tile, update the turn state to
+        // `AwaitingCalls`, otherwise wait for the next player to draw.
+        let calls = self.players[&self.seat]
+            .as_local()
+            .unwrap()
+            .find_possible_calls(tile::by_id(discard), discarding_player.next() == self.seat);
+        if discarding_player != self.seat && !calls.is_empty() {
+            self.turn_state = LocalTurnState::AwaitingCalls {
+                calls,
+                discarding_player,
+                discard,
+            };
+        } else {
+            self.turn_state = LocalTurnState::AwaitingDraw(discarding_player.next());
+        }
+    }
 }
 
 #[cs_bindgen]
@@ -314,74 +372,20 @@ impl LocalState {
         event
     }
 
-    // TODO: Have all of the state mutation methods return a `Result` once cs-bindgen
-    // supports doing so. For now we're stuck returning a bool to indicate if the
+    // TODO: Remove these duplicate functions once we can directly export the versions
+    // that return a `Result`. For now we're stuck returning a bool to indicate if the
     // operation succeeded or not.
 
-    pub fn try_draw_local_tile(&mut self, seat: Wind, id: TileId) -> bool {
-        let tile = tile::instance_by_id(id);
-
-        assert_eq!(
-            self.seat,
-            seat,
-            "The specified seat for the local player ({:?}) doesn't match the actual local seat ({:?})",
-            seat,
-            self.seat,
-        );
-
-        if self.turn_state != LocalTurnState::AwaitingDraw(seat) {
-            return false;
-        }
-
-        match self.players.get_mut(&seat).unwrap() {
-            LocalHand::Local(hand) => hand.draw_tile(tile).unwrap(),
-            LocalHand::Remote(_) => return false,
-        };
-
-        self.turn_state = LocalTurnState::AwaitingDiscard(seat);
-
-        true
+    pub fn try_draw_local_tile(&mut self, draw_id: TileId) -> bool {
+        self.draw_local_tile(draw_id).is_ok()
     }
 
     pub fn try_draw_remote_tile(&mut self, seat: Wind) -> bool {
-        if self.turn_state != LocalTurnState::AwaitingDraw(seat) {
-            return false;
-        }
-
-        match self.players.get_mut(&seat).unwrap() {
-            LocalHand::Remote(hand) => hand.draw_tile().unwrap(),
-            LocalHand::Local(_) => return false,
-        }
-
-        self.turn_state = LocalTurnState::AwaitingDiscard(seat);
-
-        true
+        self.draw_remote_tile(seat).is_ok()
     }
 
     pub fn try_discard_tile(&mut self, discarding_player: Wind, discard: TileId) -> bool {
-        self.players
-            .get_mut(&discarding_player)
-            .unwrap()
-            .discard_tile(discard)
-            .unwrap();
-
-        // If the local player can call the discarded tile, update the turn state to
-        // `AwaitingCalls`, otherwise wait for the next player to draw.
-        let calls = self.players[&self.seat]
-            .as_local()
-            .unwrap()
-            .find_possible_calls(tile::by_id(discard), discarding_player.next() == self.seat);
-        if discarding_player != self.seat && !calls.is_empty() {
-            self.turn_state = LocalTurnState::AwaitingCalls {
-                calls,
-                discarding_player,
-                discard,
-            };
-        } else {
-            self.turn_state = LocalTurnState::AwaitingDraw(discarding_player.next());
-        }
-
-        true
+        self.discard_tile(discarding_player, discard).is_ok()
     }
 
     pub fn try_pass_call(&mut self) -> bool {
@@ -432,6 +436,27 @@ impl LocalHand {
     pub fn as_local(&self) -> Option<&HandState> {
         match self {
             LocalHand::Local(hand) => Some(hand),
+            _ => None,
+        }
+    }
+
+    pub fn as_local_mut(&mut self) -> Option<&mut HandState> {
+        match self {
+            LocalHand::Local(hand) => Some(hand),
+            _ => None,
+        }
+    }
+
+    pub fn as_remote(&self) -> Option<&RemoteHand> {
+        match self {
+            LocalHand::Remote(hand) => Some(hand),
+            _ => None,
+        }
+    }
+
+    pub fn as_remote_mut(&mut self) -> Option<&mut RemoteHand> {
+        match self {
+            LocalHand::Remote(hand) => Some(hand),
             _ => None,
         }
     }
@@ -591,4 +616,9 @@ impl RemoteHand {
             Call::Ron => todo!("Handle calling a ron"),
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    
 }
