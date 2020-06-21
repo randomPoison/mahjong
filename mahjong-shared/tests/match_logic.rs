@@ -72,7 +72,7 @@ fn discard_from_hand() {
             // `state.call_tile()`.
             let waiting = waiting.clone();
             for &seat in waiting.keys() {
-                state.call_tile(seat, None).unwrap();
+                state.request_call(seat, None).unwrap();
                 local_states
                     .get_mut(&seat)
                     .unwrap()

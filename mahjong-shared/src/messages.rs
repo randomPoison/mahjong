@@ -139,6 +139,8 @@ pub enum MatchEvent {
         calls: Vec<Call>,
     },
 
+    // TODO: `Call` and `Pass` can be combined into a single `DecideCall` event once we
+    // can export `Option` types to C#.
     /// A player called the last discarded tile.
     Call(FinalCall),
 
@@ -151,7 +153,7 @@ pub enum MatchEvent {
 }
 
 #[cs_bindgen]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FinalCall {
     pub caller: Wind,
     pub called_from: Wind,

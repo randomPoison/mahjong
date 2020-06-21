@@ -120,8 +120,28 @@ impl MatchState {
         }
     }
 
+    /// Registers a player's request to call the last discarded tile.
+    ///
+    /// This method does not immediately resolve the call phase, since multiple players
+    /// may be able to call a given discard and the winning call is determined by the
+    /// precedence order of the call. Once all calling players have registered their
+    /// requested call, use [`decide_call`] to determine which call wins (if any).
+    ///
+    /// Returns `true` if all calling players have registered their call (and therefore
+    /// [`decide_call`] can now be called), returns `false` if there are still players
+    /// that need to make a call.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// * The player at `seat` cannot call the last discarded tile.
+    /// * The player at `seat` has already registered their call for the tile.
+    /// * The specified call is not a valid call for the player to make.
+    ///
+    /// [`decide_call`]: #method.decide_call
     #[throws(anyhow::Error)]
-    pub fn call_tile(&mut self, seat: Wind, call: Option<Call>) {
+    pub fn request_call(&mut self, seat: Wind, call: Option<Call>) -> bool {
         let (calls, waiting) = match &mut self.turn_state {
             TurnState::AwaitingCalls { calls, waiting, .. } => (calls, waiting),
 
@@ -171,10 +191,12 @@ impl MatchState {
 
         // NOTE: No state transition here. Once there are no more waiting players, the match
         // runner calls `decide_call` to apply the outcome of the call phase.
+
+        waiting.is_empty()
     }
 
     #[throws(anyhow::Error)]
-    pub fn decide_call(&mut self) -> Option<(Wind, Call)> {
+    pub fn decide_call(&mut self) -> Option<FinalCall> {
         let (calls, waiting, &mut discard_id, &mut discarding_player) = match &mut self.turn_state {
             TurnState::AwaitingCalls {
                 calls,
@@ -232,7 +254,12 @@ impl MatchState {
             self.turn_state = TurnState::AwaitingDraw(seat.next());
 
             // Return the winning call, I guess?
-            Some((seat, call))
+            Some(FinalCall {
+                called_from: discarding_player,
+                discard: discard_id,
+                caller: seat,
+                winning_call: call,
+            })
         } else {
             // If all players passed, move to the next player's draw phase and return `None`.
             self.turn_state = TurnState::AwaitingDraw(discarding_player.next());

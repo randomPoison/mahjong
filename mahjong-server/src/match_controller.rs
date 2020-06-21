@@ -78,7 +78,7 @@ impl MatchController {
         info!(?seat, "Player joining match");
 
         if self.clients.contains_key(&seat) {
-            bail!("Seat is already occupied");
+            bail!("Seat {:?} is already occupied", seat);
         }
 
         self.clients.insert(seat, ClientProxy::Client(controller));
@@ -157,30 +157,60 @@ impl MatchController {
                 self.broadcast_draw(next_player, draw);
             }
 
-            TurnState::MatchEnded { .. } => {
-                trace!("Match ended after discard");
-
-                self.broadcast(MatchEvent::TileDiscarded {
-                    seat: player,
-                    tile,
-                    calls: Default::default(),
-                });
-
-                self.broadcast(MatchEvent::MatchEnded);
-            }
-
             // If we're not waiting on any calls, broadcast the discard event to all players.
-            _ => panic!("Unexpected turn state: {:?}", self.state.turn_state),
+            _ => unreachable!("Invalid turn state: {:?}", self.state.turn_state),
         }
 
         Ok(())
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, player, call))]
     pub fn call_tile(&mut self, player: Wind, call: Option<Call>) -> Result<()> {
-        trace!("Attempting to make call");
+        trace!("Player {:?} attempting to make call {:?}", player, call);
 
-        todo!("Implement calling")
+        // Register the requested call with the match state. If there are still more players
+        // that need to make a call, then return early and wait for the remaining players.
+        //
+        // NOTE: There's nothing else for us to do in this case since the server doesn't
+        // broadcast any calls until the final decision is made, and requesting a call
+        // doesn't directly change the turn state.
+        if !self.state.request_call(player, call)? {
+            trace!("More players need to make a call, not deciding call yet");
+            return Ok(());
+        }
+
+        // All calling players have registered their intended call, so now we determine
+        // which call wins.
+        trace!("All players have called, deciding call now");
+        match self.state.decide_call()? {
+            Some(winning_call) => {
+                trace!("Winning call decided: {:?}", winning_call);
+                self.broadcast(MatchEvent::Call(winning_call));
+            }
+
+            None => {
+                trace!("All players passed");
+                self.broadcast(MatchEvent::Pass);
+            }
+        }
+
+        // Handle next step in the match.
+        match &self.state.turn_state {
+            &TurnState::AwaitingDraw(next_player) => {
+                trace!("Drawing for next player {:?} after call", next_player);
+                let draw = self.state.draw_for_player(next_player)?;
+                self.broadcast_draw(next_player, draw);
+            }
+
+            TurnState::MatchEnded { .. } => {
+                trace!("Match ended after call");
+                self.broadcast(MatchEvent::MatchEnded);
+            }
+
+            _ => unimplemented!("Invalid turn state: {:?}", self.state.turn_state),
+        }
+
+        Ok(())
     }
 
     #[tracing::instrument(skip(self))]
