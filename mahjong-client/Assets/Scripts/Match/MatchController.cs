@@ -187,7 +187,7 @@ namespace Synapse.Mahjong.Match
                             this);
 
                         // Update the game state tracking for the client.
-                        if (!_localState.TryDrawLocalTile(_seat, localDraw.Tile))
+                        if (!_localState.TryDrawLocalTile(localDraw.Tile))
                         {
                             throw new OutOfSyncException(
                                 $"Unable to perform local draw of tile {localDraw.Tile}");
