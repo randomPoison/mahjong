@@ -140,14 +140,21 @@ pub enum MatchEvent {
     },
 
     /// A player called the last discarded tile.
-    Call {
-        caller: Wind,
-        called_from: Wind,
-        tile: TileId,
-        winning_call: Call,
-    },
+    Call(FinalCall),
+
+    /// No player called the last discard.
+    Pass,
 
     // TODO: Include winner and scoring info. This requires support for `Option`, since
     // there may not be a winner.
     MatchEnded,
+}
+
+#[cs_bindgen]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct FinalCall {
+    pub caller: Wind,
+    pub called_from: Wind,
+    pub discard: TileId,
+    pub winning_call: Call,
 }

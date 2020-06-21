@@ -76,7 +76,7 @@ fn discard_from_hand() {
                 local_states
                     .get_mut(&seat)
                     .unwrap()
-                    .make_call(None)
+                    .decide_call(None)
                     .unwrap();
             }
 

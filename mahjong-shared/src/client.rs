@@ -4,7 +4,7 @@ use crate::{
     messages::*,
     tile::{self, TileId, TileInstance, Wind},
 };
-use anyhow::{bail, ensure, Context};
+use anyhow::{anyhow, bail, ensure, Context};
 use cs_bindgen::prelude::*;
 use fehler::throws;
 use serde::{Deserialize, Serialize};
@@ -138,92 +138,101 @@ impl LocalState {
                 self.discard_tile(seat, id)?;
             }
 
-            &MatchEvent::Call {
-                called_from,
-                caller,
-                winning_call,
-                tile: id,
-            } => {
-                let discard = self
-                    .players
-                    .get_mut(&called_from)
-                    .unwrap()
-                    .call_last_discard()
-                    .expect("Cannot call from a player with no discards");
+            &MatchEvent::Call(call) => self.decide_call(Some(call))?,
 
-                ensure!(
-                    id == discard.id,
-                    "Last discarded tile {:?} for {:?} player does not match expected discard {:?}",
-                    discard,
-                    called_from,
-                    id,
-                );
-
-                self.players
-                    .get_mut(&caller)
-                    .unwrap()
-                    .call_tile(discard, winning_call)
-                    .context("Failed to call tile locally")?;
-            }
+            MatchEvent::Pass => self.decide_call(None)?,
 
             MatchEvent::MatchEnded => {}
         }
     }
 
+    /// Applies a winning call to the match state.
     #[throws(anyhow::Error)]
-    pub fn make_call(&mut self, call: Option<Call>) {
-        let (calls, &discard_id, &discarding_player) = match &self.turn_state {
+    pub fn decide_call(&mut self, call: Option<FinalCall>) {
+        cov_mark::hit!(local_state_decide_call);
+
+        let (discard, discarding_player, calls) = match &self.turn_state {
             LocalTurnState::AwaitingCalls {
-                calls,
                 discard,
                 discarding_player,
-            } => (calls, discard, discarding_player),
+                calls,
+            } => (discard, discarding_player, calls),
 
-            _ => bail!(
-                "Call {:?} is not valid for current turn state {:?}",
-                call,
-                self.turn_state,
-            ),
+            _ => bail!("Call is not valid for turn state {:?}", self.turn_state),
         };
 
-        match call {
-            Some(call) => {
+        if let Some(call) = call {
+            // Sanity check that the discarding player and discarded tile specified match the
+            // ones tracked locally.
+            ensure!(
+                *discarding_player == call.called_from,
+                "Called from {:?}, but expected to call from {:?}",
+                call.called_from,
+                discarding_player,
+            );
+            ensure!(
+                *discard == call.discard,
+                "Called {:?} from {:?}, but expected to call {:?}",
+                call.discard,
+                call.called_from,
+                discard,
+            );
+
+            // If the local player made the winning call, also sanity check the call against the
+            // list of valid calls.
+            //
+            // TODO: It would probably be better to locally track what call the local player
+            // actually made in order to properly validate that the final call matches the one
+            // that was submitted to the server.
+            if call.caller == self.seat {
                 ensure!(
-                    calls.contains(&call),
-                    "Specified call {:?} was not in list of valid calls {:?}",
-                    call,
+                    calls.contains(&call.winning_call),
+                    "Winning call {:?} for local player {:?} not in list of valid calls {:?}",
+                    call.winning_call,
+                    self.seat,
                     calls,
                 );
+            }
 
-                let discarding_player = self.players.get_mut(&discarding_player).unwrap();
+            let discard_instance = {
+                let discarding_player = self.players.get_mut(&call.called_from).unwrap();
 
-                // Sanity check that the discarded tile we have locally matches the tile that the
-                // server said was discarded.
-                let last_discard = discarding_player.last_discard();
                 ensure!(
-                    Some(discard_id) == last_discard,
-                    "Unexpected value for last discarded tile, expected {:?} but found {:?}",
-                    discard_id,
-                    last_discard,
+                    discarding_player.last_discard() == Some(*discard),
+                    "Last discarded tile {:?} for {:?} player does not match expected discard {:?}",
+                    discarding_player.last_discard(),
+                    call.called_from,
+                    discard,
                 );
 
-                // Remove the tile from the player's discards and add it to the calling player's
-                // hand.
-                let discard = discarding_player.call_last_discard().unwrap();
-                let hand = self.players.get_mut(&self.seat).unwrap();
-                hand.call_tile(discard, call)?;
-            }
+                discarding_player
+                    .call_last_discard()
+                    .ok_or_else(|| anyhow!("Cannot call from a player with no discards"))?
+            };
 
-            // Player is passing instead of calling, so skip the turn state ahead to wait for
-            // the next player to draw.
-            None => {
-                self.turn_state = LocalTurnState::AwaitingDraw(discarding_player.next());
-            }
+            // TODO: We have a potential consistency error here. If the attempt to add the
+            // called tile to the calling player's hand fails, then we'll return early from the
+            // function without updating the turn state but after having already removing the
+            // tile tile from the other player's discards. It's not clear if this case can
+            // actually be triggered without some other bug also having happened, since we've
+            // already confirmed we're in the correct turn state (which should mean that the
+            // hand state is also correct).
+            self.players
+                .get_mut(&call.caller)
+                .unwrap()
+                .call_tile(discard_instance, call.winning_call)
+                .context("Failed to call tile locally")?;
+
+            self.turn_state = LocalTurnState::AwaitingDraw(call.caller.next());
+        } else {
+            self.turn_state = LocalTurnState::AwaitingDraw(discarding_player.next());
         }
     }
 
     #[throws(anyhow::Error)]
     pub fn draw_local_tile(&mut self, draw_id: TileId) {
+        cov_mark::hit!(local_state_draw_local);
+
         ensure!(
             self.turn_state == LocalTurnState::AwaitingDraw(self.seat),
             "Local draw is not valid for current turn state {:?}, drawn tile: {:?}",
@@ -245,6 +254,8 @@ impl LocalState {
 
     #[throws(anyhow::Error)]
     pub fn draw_remote_tile(&mut self, seat: Wind) {
+        cov_mark::hit!(local_state_draw_remote);
+
         ensure!(
             self.turn_state == LocalTurnState::AwaitingDraw(seat),
             "Remote draw is not valid for current turn state {:?}, drawing player: {:?}",
@@ -264,6 +275,8 @@ impl LocalState {
 
     #[throws(anyhow::Error)]
     pub fn discard_tile(&mut self, discarding_player: Wind, discard: TileId) {
+        cov_mark::hit!(local_state_discard_tile);
+
         ensure!(
             self.turn_state == LocalTurnState::AwaitingDiscard(discarding_player),
             "Discard is not valid for turn state {:?}, discarding_player: {:?}, discard: {:?}",
@@ -386,14 +399,6 @@ impl LocalState {
 
     pub fn try_discard_tile(&mut self, discarding_player: Wind, discard: TileId) -> bool {
         self.discard_tile(discarding_player, discard).is_ok()
-    }
-
-    pub fn try_pass_call(&mut self) -> bool {
-        self.make_call(None).is_ok()
-    }
-
-    pub fn try_make_call(&mut self, call: Call) -> bool {
-        self.make_call(Some(call)).is_ok()
     }
 }
 
@@ -559,6 +564,21 @@ pub struct RemoteHand {
 }
 
 impl RemoteHand {
+    /// Creates a new `RemoteHand` with an valid initial setup for the start of a match.
+    ///
+    /// The returned hand will have 13 tiles in the hand and no initial draw.
+    pub fn new() -> Self {
+        Self {
+            tiles: 13,
+            has_current_draw: false,
+            open_chows: Default::default(),
+            open_pongs: Default::default(),
+            open_kongs: Default::default(),
+            closed_kongs: Default::default(),
+            discards: Default::default(),
+        }
+    }
+
     #[throws(anyhow::Error)]
     pub fn draw_tile(&mut self) {
         ensure!(
@@ -620,5 +640,54 @@ impl RemoteHand {
 
 #[cfg(test)]
 mod tests {
-    
+    use crate::{client::*, hand::HandState, match_state::MatchId, tile::Wind, tile::TILE_SET};
+    use maplit::hashmap;
+
+    #[test]
+    fn local_state_handle_event_defers_to_other_functions() {
+        let mut tile_set = TILE_SET.clone();
+        let mut state = LocalState {
+            id: MatchId::new(0),
+            seat: Wind::East,
+            players: hashmap! {
+                Wind::East => LocalHand::Local(HandState::new(&mut tile_set)),
+                Wind::South => LocalHand::Remote(RemoteHand::new()),
+                Wind::West => LocalHand::Remote(RemoteHand::new()),
+                Wind::North => LocalHand::Remote(RemoteHand::new()),
+            },
+            turn_state: LocalTurnState::AwaitingDraw(Wind::East),
+        };
+
+        {
+            cov_mark::check!(local_state_decide_call);
+            let _ = state.handle_event(&MatchEvent::Call(FinalCall {
+                called_from: Wind::South,
+                discard: TILE_SET[0].id,
+                caller: Wind::East,
+                winning_call: Call::Kan(TILE_SET[0].tile),
+            }));
+        }
+
+        {
+            cov_mark::check!(local_state_draw_local);
+            let _ = state.handle_event(&MatchEvent::LocalDraw {
+                seat: Wind::East,
+                tile: TILE_SET[0].id,
+            });
+        }
+
+        {
+            cov_mark::check!(local_state_draw_remote);
+            let _ = state.handle_event(&MatchEvent::RemoteDraw { seat: Wind::South });
+        }
+
+        {
+            cov_mark::check!(local_state_discard_tile);
+            let _ = state.handle_event(&MatchEvent::TileDiscarded {
+                seat: Wind::East,
+                tile: TILE_SET[0].id,
+                calls: Default::default(),
+            });
+        }
+    }
 }
