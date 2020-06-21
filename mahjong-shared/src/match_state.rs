@@ -6,7 +6,7 @@ use crate::{
     messages::*,
     tile::{self, TileId, TileInstance, Wind},
 };
-use anyhow::bail;
+use anyhow::*;
 use cs_bindgen::prelude::*;
 use derive_more::Display;
 use fehler::throws;
@@ -82,8 +82,26 @@ impl MatchState {
         id
     }
 
+    /// Discards the specified tile for the specified player.
+    ///
+    /// Returns `true` if any players can call the tile, `false` otherwise.
+    ///
+    /// # Turn State
+    ///
+    /// If the discard action succeeds, the new turn state will be `AwaitingCalls`. Note
+    /// that this is the case even if no players can call the discarded tile (i.e. it
+    /// returns `false`).
+    ///
+    /// If the action fails, no change is made to the turn state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    ///
+    /// * The current turn state is not `AwaitingDiscard`.
+    /// * `seat` is not the player that is currently discarding.
     #[throws(anyhow::Error)]
-    pub fn discard_tile(&mut self, seat: Wind, tile: TileId) {
+    pub fn discard_tile(&mut self, seat: Wind, tile: TileId) -> &HashMap<Wind, Vec<Call>> {
         // Verify that the discard action is valid.
         if self.turn_state != TurnState::AwaitingDiscard(seat) {
             bail!(
@@ -93,8 +111,11 @@ impl MatchState {
             );
         }
 
-        let hand = self.players.get_mut(&seat).unwrap();
-        hand.discard_tile(tile)?;
+        self.players
+            .get_mut(&seat)
+            .unwrap()
+            .discard_tile(tile)
+            .with_context(|| anyhow!("Player {:?} attempting to discard {:?}", seat, tile))?;
 
         // Determine if any players are able to call the tile.
         let mut waiting = HashMap::new();
@@ -108,15 +129,18 @@ impl MatchState {
         // Update the turn state based on whether or not any players can call the discarded
         // tile. If any players can call, we wait for all players to either call or pass.
         // Otherwise, we wait for the next player's draw.
-        if !waiting.is_empty() {
-            self.turn_state = TurnState::AwaitingCalls {
-                discarding_player: seat,
-                discard: tile,
-                calls: HashMap::new(),
-                waiting,
-            }
-        } else {
-            self.turn_state = TurnState::AwaitingDraw(seat.next());
+        self.turn_state = TurnState::AwaitingCalls {
+            discarding_player: seat,
+            discard: tile,
+            calls: HashMap::new(),
+            waiting,
+        };
+
+        // NOTE: We need to re-match on `turn_state` in order to return return a reference
+        // to the set of waiting players.
+        match &self.turn_state {
+            TurnState::AwaitingCalls { waiting, .. } => waiting,
+            _ => unreachable!(),
         }
     }
 
@@ -130,6 +154,12 @@ impl MatchState {
     /// Returns `true` if all calling players have registered their call (and therefore
     /// [`decide_call`] can now be called), returns `false` if there are still players
     /// that need to make a call.
+    ///
+    /// # Turn State
+    ///
+    /// If the call is successfully requested the match remains in the `AwaitingCall`
+    /// state, with the calling player removed from the list of players that still need
+    /// to call. No change is made if the request fails.
     ///
     /// # Errors
     ///

@@ -120,45 +120,36 @@ impl MatchController {
         // TODO: Verify that the client submitting the action is actually the one that
         // controls the player.
 
-        self.state.discard_tile(player, tile)?;
+        let calling_players = self.state.discard_tile(player, tile)?;
+        trace!(
+            "Successfully discarded tile, calling players: {:?}",
+            calling_players,
+        );
 
-        trace!("Successfully discarded tile");
-
-        match &self.state.turn_state {
-            // If any players can call the discarded tile, include the list of possible calls
-            // when notifying them of the discard.
-            TurnState::AwaitingCalls { waiting, .. } => {
-                trace!("Awaiting calls after discard: {:?}", waiting);
-
-                for seat in Wind::iter() {
-                    let calls = waiting.get(&seat).cloned().unwrap_or_default();
-                    self.clients
-                        .get_mut(&seat)
-                        .unwrap()
-                        .send_event(MatchEvent::TileDiscarded {
-                            seat: player,
-                            tile,
-                            calls,
-                        })
-                        .expect("Failed to send match update to client");
-                }
-            }
-
-            &TurnState::AwaitingDraw(next_player) => {
-                trace!("Awaiting for next player to draw ({:?})", next_player);
-
-                self.broadcast(MatchEvent::TileDiscarded {
+        // Notify each client of the draw event, including the list of calls that the local
+        // player can make.
+        for seat in Wind::iter() {
+            let calls = calling_players.get(&seat).cloned().unwrap_or_default();
+            self.clients
+                .get_mut(&seat)
+                .unwrap()
+                .send_event(MatchEvent::TileDiscarded {
                     seat: player,
                     tile,
-                    calls: Default::default(),
-                });
+                    calls,
+                })
+                .expect("Failed to send match update to client");
+        }
 
-                let draw = self.state.draw_for_player(next_player)?;
-                self.broadcast_draw(next_player, draw);
-            }
+        // If no players can call the discarded tile, immediately move past the call phase
+        // and draw for the next player.
+        if calling_players.is_empty() {
+            self.state.decide_call()?;
+            self.broadcast(MatchEvent::Pass);
 
-            // If we're not waiting on any calls, broadcast the discard event to all players.
-            _ => unreachable!("Invalid turn state: {:?}", self.state.turn_state),
+            let next_player = player.next();
+            let draw = self.state.draw_for_player(next_player)?;
+            self.broadcast_draw(next_player, draw);
         }
 
         Ok(())

@@ -296,21 +296,27 @@ impl LocalState {
                 )
             })?;
 
-        // If the local player can call the discarded tile, update the turn state to
-        // `AwaitingCalls`, otherwise wait for the next player to draw.
-        let calls = self.players[&self.seat]
-            .as_local()
-            .unwrap()
-            .find_possible_calls(tile::by_id(discard), discarding_player.next() == self.seat);
-        if discarding_player != self.seat && !calls.is_empty() {
-            self.turn_state = LocalTurnState::AwaitingCalls {
-                calls,
-                discarding_player,
-                discard,
-            };
+        // Determine if the local player can call the discarded tile.
+        let calls = if discarding_player != self.seat {
+            self.players[&self.seat]
+                .as_local()
+                .unwrap()
+                .find_possible_calls(tile::by_id(discard), discarding_player.next() == self.seat)
         } else {
-            self.turn_state = LocalTurnState::AwaitingDraw(discarding_player.next());
-        }
+            Default::default()
+        };
+
+        // Wait for a call to be made.
+        //
+        // NOTE: We always move to the `AwaitingCalls` state after a player discards, even
+        // though we don't know if any players can call the discard. This avoid some
+        // complexity in the match logic; We always wait for the server to confirm that
+        // either a call was made or all players passed before moving to the next step.
+        self.turn_state = LocalTurnState::AwaitingCalls {
+            calls,
+            discarding_player,
+            discard,
+        };
     }
 }
 
@@ -642,7 +648,11 @@ impl RemoteHand {
 mod tests {
     use crate::{client::*, hand::HandState, match_state::MatchId, tile::Wind, tile::TILE_SET};
     use maplit::hashmap;
+    use pretty_assertions::assert_eq;
 
+    // Check that `LocalState::handle_event` is deferring to the more specific event
+    // handling functions. This ensures that `LocalState` doesn't behave differently
+    // when using `handle_event` vs calling the specific methods directly.
     #[test]
     fn local_state_handle_event_defers_to_other_functions() {
         let mut tile_set = TILE_SET.clone();
@@ -689,5 +699,33 @@ mod tests {
                 calls: Default::default(),
             });
         }
+    }
+
+    // Check that `LocalState` always goes into the `AwaitingCalls` turn state after a
+    // player discards a tile, even if the local player can't call the discarded tile.
+    #[test]
+    fn local_state_awaits_calls_after_discard() {
+        let mut tile_set = TILE_SET.clone();
+        let mut state = LocalState {
+            id: MatchId::new(0),
+            seat: Wind::East,
+            players: hashmap! {
+                Wind::East => LocalHand::Local(HandState::new(&mut tile_set)),
+                Wind::South => LocalHand::Remote(RemoteHand::new()),
+                Wind::West => LocalHand::Remote(RemoteHand::new()),
+                Wind::North => LocalHand::Remote(RemoteHand::new()),
+            },
+            turn_state: LocalTurnState::AwaitingDraw(Wind::South),
+        };
+
+        state.draw_remote_tile(Wind::South).unwrap();
+        state.discard_tile(Wind::South, TILE_SET[0].id).unwrap();
+
+        let expected = LocalTurnState::AwaitingCalls {
+            calls: vec![],
+            discard: TILE_SET[0].id,
+            discarding_player: Wind::South,
+        };
+        assert_eq!(expected, state.turn_state);
     }
 }

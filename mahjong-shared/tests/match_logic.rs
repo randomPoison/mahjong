@@ -69,18 +69,22 @@ fn discard_from_hand() {
         // change the turn order which isn't something we care about testing here.
         if let TurnState::AwaitingCalls { waiting, .. } = &state.turn_state {
             // NOTE: Clone `waiting` so that we aren't still borrowing `state` when we do
-            // `state.call_tile()`.
+            // `state.request_call()`.
             let waiting = waiting.clone();
             for &seat in waiting.keys() {
                 state.request_call(seat, None).unwrap();
-                local_states
-                    .get_mut(&seat)
-                    .unwrap()
-                    .decide_call(None)
-                    .unwrap();
             }
 
             assert_eq!(None, state.decide_call().unwrap());
+        }
+
+        // Notify each of the local players that no call was made.
+        for seat in Wind::iter() {
+            local_states
+                .get_mut(&seat)
+                .unwrap()
+                .decide_call(None)
+                .unwrap();
         }
         assert_state_sync(&state, &local_states);
 
@@ -137,7 +141,7 @@ fn assert_state_sync(state: &MatchState, local_states: &HashMap<Wind, LocalState
                 },
             ) => {
                 // Make sorted copies of the list of calls so that we can compare them directly.
-                let mut expected_calls = waiting[&client_seat].clone();
+                let mut expected_calls = waiting.get(&client_seat).cloned().unwrap_or_default();
                 let mut actual_calls = local_calls.clone();
                 expected_calls.sort();
                 actual_calls.sort();
