@@ -28,7 +28,6 @@ namespace Synapse.Mahjong.Match
 
         #region Configuration Fields
 
-        [SerializeField] private Wind _seat = default;
         [SerializeField] private Transform _handRoot = default;
         [SerializeField] private Transform _drawTileAnchor = default;
         [SerializeField] private Transform _discardRoot = default;
@@ -46,8 +45,6 @@ namespace Synapse.Mahjong.Match
         #endregion
 
         #region Properties
-
-        public Wind Seat => _seat;
 
         public ReadOnlyCollection<TileView> Discards => _discards.AsReadOnly();
 
@@ -127,6 +124,7 @@ namespace Synapse.Mahjong.Match
                 foreach (var (index, tileObj) in _tiles.Enumerate())
                 {
                     tileObj.transform.SetParent(_handRoot);
+                    tileObj.transform.localRotation = Quaternion.identity;
                     tileObj.transform.localPosition = new Vector3(
                         leftSide + TileWidth * index,
                         0f,

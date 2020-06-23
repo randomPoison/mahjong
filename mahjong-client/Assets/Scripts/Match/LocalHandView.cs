@@ -8,8 +8,8 @@ namespace Synapse.Mahjong.Match
 {
     public sealed class LocalHandView : PlayerHandView
     {
-        private List<TileView> _tiles = new List<TileView>();
-        private TileView _currentDraw = null;
+        private List<TileView> _tileViews = new List<TileView>();
+        private TileView _drawView = null;
 
         #region Events
 
@@ -23,7 +23,7 @@ namespace Synapse.Mahjong.Match
         public void AddToHand(TileView tile)
         {
             // Add the tile to the internal state tracking for the hand.
-            _tiles.Add(tile);
+            _tileViews.Add(tile);
             tile.Clicked += OnTileClicked;
 
             AddTile(tile.gameObject);
@@ -32,11 +32,11 @@ namespace Synapse.Mahjong.Match
         public async UniTask DrawTile(TileView tile)
         {
             Debug.Assert(
-                _currentDraw == null,
+                _drawView == null,
                 $"Adding draw tile {tile.Model} to player hand {this} when player " +
                 $"already has draw tile");
 
-            _currentDraw = tile;
+            _drawView = tile;
             tile.Clicked += OnTileClicked;
 
             AddDrawTile(tile.gameObject);
@@ -53,26 +53,26 @@ namespace Synapse.Mahjong.Match
 
             // Get the `TileView` object for the selected tile, either from the tiles
             // in the player's hand or from the current draw.
-            var discardIndex = _tiles.FindIndex(tile => tile.Model.Id.Element0 == id.Element0);
+            var discardIndex = _tileViews.FindIndex(tile => tile.Model.Id.Element0 == id.Element0);
             if (discardIndex >= 0)
             {
-                discarded = _tiles[discardIndex];
-                _tiles.RemoveAt(discardIndex);
+                discarded = _tileViews[discardIndex];
+                _tileViews.RemoveAt(discardIndex);
 
                 // Remove the tile object from the underlying view data.
                 RemoveFromHand(discardIndex);
             }
-            else if (_currentDraw != null && _currentDraw.Model.Id.Element0 == id.Element0)
+            else if (_drawView != null && _drawView.Model.Id.Element0 == id.Element0)
             {
-                discarded = _currentDraw;
-                _currentDraw = null;
+                discarded = _drawView;
+                _drawView = null;
 
                 // Remove the tile object from the underlying view data.
                 RemoveCurrentDraw();
             }
             else
             {
-                throw new ArgumentException($"Tile {id} is not in {Seat} player's hand");
+                throw new ArgumentException($"Tile {id} is not in player's hand");
             }
 
             // Remove the click handler so that we don't get click events from discarded
@@ -84,11 +84,11 @@ namespace Synapse.Mahjong.Match
 
             // If we didn't discard the drawn tile, merge the drawn tile into the
             // player's hand.
-            if (_currentDraw != null)
+            if (_drawView != null)
             {
                 RemoveCurrentDraw();
-                AddToHand(_currentDraw);
-                _currentDraw = null;
+                AddToHand(_drawView);
+                _drawView = null;
             }
         }
 

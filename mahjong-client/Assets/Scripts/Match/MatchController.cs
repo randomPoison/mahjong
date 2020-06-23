@@ -21,7 +21,10 @@ namespace Synapse.Mahjong.Match
         [Tooltip(
             "The root object for each player's hand. Tiles in each players' hand will " +
             "be made children of these objects.")]
-        private PlayerHandView[] _hands = default;
+        private Transform[] _handRoots = default;
+
+        [SerializeField] private LocalHandView _localHandPrefab = default;
+        [SerializeField] private RemoteHandView _remoteHandPrefab = default;
 
         // TODO: Move the tile asset configuration into a scriptable object. While we
         // only have one set of tile assets we can get away with baking it directly into
@@ -56,6 +59,8 @@ namespace Synapse.Mahjong.Match
         private LocalState _localState;
 
         private Wind _seat;
+
+        private PlayerHandView[] _hands = new PlayerHandView[4];
 
         // Tracking for the most recent discard action that the player performed, used
         // to handle forward-simulation and state verification after the client receives
@@ -102,7 +107,12 @@ namespace Synapse.Mahjong.Match
             {
                 if (seat == _localState.Seat())
                 {
-                    var view = (LocalHandView)_hands[(int)seat];
+                    // Instantiate the local hand view controller.
+                    var view = Instantiate(_localHandPrefab, _handRoots[(int)seat]);
+                    _hands[(int)seat] = view;
+
+                    // Populate the hand with its initial state.
+
                     var handState = _localState.LocalHand(seat);
                     var tiles = handState.GetTiles();
 
@@ -119,7 +129,12 @@ namespace Synapse.Mahjong.Match
                 }
                 else
                 {
-                    var view = (RemoteHandView)_hands[(int)seat];
+                    // Instantiate the remote hand view controller.
+                    var view = Instantiate(_remoteHandPrefab, _handRoots[(int)seat]);
+                    _hands[(int)seat] = view;
+
+                    // Populate the hand with its initial state.
+
                     view.FillWithDummyTiles(_dummyPrefab);
 
                     if (_localState.PlayerHasCurrentDraw(seat))
@@ -360,7 +375,7 @@ namespace Synapse.Mahjong.Match
             var id = await hand.OnClickTileAsync(_cancellation.Token);
 
             // Attempt to discard the tile. If the operation fails, ignore the click event.
-            if (!_localState.TryDiscardTile(hand.Seat, id))
+            if (!_localState.TryDiscardTile(_seat, id))
             {
                 throw new NotImplementedException(
                     "What does it mean if the tile click fails here?");
@@ -380,24 +395,11 @@ namespace Synapse.Mahjong.Match
 
             // If the local attempt to discard the tile succeeded, send a request to the
             // server to perform the action.
-            var request = _serverState.RequestDiscardTile(hand.Seat, id);
+            var request = _serverState.RequestDiscardTile(_seat, id);
             _socket.SendString(request);
         }
 
         #region Unity Lifecycle Methods
-
-        private void Awake()
-        {
-            // Validate that the `PlayerHand` object for each seat is correctly configured.
-            foreach (var seat in EnumUtils.GetValues<Wind>())
-            {
-                var hand = _hands[(int)seat];
-                Debug.Assert(
-                    seat == hand.Seat,
-                    $"{nameof(PlayerHandView)} setup is incorrect, hand at seat {seat}" +
-                    $"configured for seat {hand.Seat}");
-            }
-        }
 
         private void OnDestroy()
         {
