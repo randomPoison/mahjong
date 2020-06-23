@@ -139,7 +139,7 @@ namespace Synapse.Mahjong.Match
 
                     if (_localState.PlayerHasCurrentDraw(seat))
                     {
-                        await view.DrawDummyTile();
+                        view.DrawDummyTile(_dummyPrefab);
                     }
                 }
 
@@ -226,7 +226,7 @@ namespace Synapse.Mahjong.Match
 
                         // Update the visuals based on the draw event.
                         var view = (RemoteHandView)_hands[(int)remoteDraw.Seat];
-                        await view.DrawDummyTile();
+                        view.DrawDummyTile(_dummyPrefab);
                     }
                     break;
 

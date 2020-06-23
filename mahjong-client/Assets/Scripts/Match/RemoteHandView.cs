@@ -27,14 +27,11 @@ namespace Synapse.Mahjong.Match
             AddDiscard(tile);
         }
 
-        public async UniTask DrawDummyTile()
+        public void DrawDummyTile(GameObject prefab)
         {
-            throw new NotImplementedException();
+            AddDrawTile(Instantiate(prefab));
 
-            // TODO: Animate the draw action. This delay is just here as a placeholder
-            // to ensure the code handles the delay that will eventually be here once we
-            // implement an animation.
-            await UniTask.Delay(500);
+            // TODO: Animate the draw action.
         }
     }
 }
