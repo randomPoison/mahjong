@@ -92,7 +92,7 @@ namespace Synapse.Mahjong.Match
             }
         }
 
-        public override void CallTile(TileView discard, ICall call)
+        public void CallTile(TileView discard, ICall call)
         {
             throw new NotImplementedException("Implement calling for local hand");
         }

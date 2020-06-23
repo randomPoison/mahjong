@@ -314,7 +314,23 @@ namespace Synapse.Mahjong.Match
                         }
 
                         var callingHand = _hands[(int)call.Caller];
-                        callingHand.CallTile(discardView, call.WinningCall);
+                        switch (callingHand)
+                        {
+                            case LocalHandView localHand:
+                            {
+                                localHand.CallTile(discardView, call.WinningCall);
+                            }
+                            break;
+
+                            case RemoteHandView remoteHand:
+                            {
+                                remoteHand.CallTile(
+                                    discardView,
+                                    call.WinningCall,
+                                    id => InstantiateTile(global::Mahjong.InstanceById(id)));
+                            }
+                            break;
+                        }
                     }
                     break;
 

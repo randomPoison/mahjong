@@ -60,8 +60,6 @@ namespace Synapse.Mahjong.Match
             return removed;
         }
 
-        public abstract void CallTile(TileView discard, ICall call);
-
         protected void AddTile(GameObject tile)
         {
             _tiles.Add(tile);
@@ -116,6 +114,12 @@ namespace Synapse.Mahjong.Match
             LayoutHand();
         }
 
+        protected void AddMeld(List<TileView> meld)
+        {
+            _melds.Add(meld);
+            LayoutHand();
+        }
+
         private void LayoutHand()
         {
             // Layout tiles in the player's hand.
@@ -147,6 +151,8 @@ namespace Synapse.Mahjong.Match
                     tile.transform.localRotation = Quaternion.identity;
                 }
             }
+
+            // TODO: Layout the melds.
         }
     }
 }
