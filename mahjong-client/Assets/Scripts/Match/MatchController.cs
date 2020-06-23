@@ -6,7 +6,6 @@ using System.Threading;
 using UniRx.Async;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
-using UnityEngine.SocialPlatforms;
 using UnityEngine.UI;
 
 namespace Synapse.Mahjong.Match
@@ -22,7 +21,7 @@ namespace Synapse.Mahjong.Match
         [Tooltip(
             "The root object for each player's hand. Tiles in each players' hand will " +
             "be made children of these objects.")]
-        private PlayerHand[] _hands = default;
+        private PlayerHandView[] _hands = default;
 
         // TODO: Move the tile asset configuration into a scriptable object. While we
         // only have one set of tile assets we can get away with baking it directly into
@@ -101,31 +100,31 @@ namespace Synapse.Mahjong.Match
             // starting hand.
             foreach (var seat in EnumUtils.GetValues<Wind>())
             {
-                var hand = _hands[(int)seat];
-
                 if (seat == _localState.Seat())
                 {
+                    var view = (LocalHandView)_hands[(int)seat];
                     var handState = _localState.LocalHand(seat);
                     var tiles = handState.GetTiles();
 
                     foreach (var tile in tiles)
                     {
-                        hand.AddToHand(InstantiateTile(tile));
+                        view.AddToHand(InstantiateTile(tile));
                     }
 
                     if (handState.HasCurrentDraw())
                     {
                         var currentDraw = handState.GetCurrentDraw();
-                        await hand.DrawTile(InstantiateTile(currentDraw));
+                        await view.DrawTile(InstantiateTile(currentDraw));
                     }
                 }
                 else
                 {
-                    hand.FillWithDummyTiles(_dummyPrefab);
+                    var view = (RemoteHandView)_hands[(int)seat];
+                    view.FillWithDummyTiles(_dummyPrefab);
 
                     if (_localState.PlayerHasCurrentDraw(seat))
                     {
-                        await hand.DrawDummyTile();
+                        await view.DrawDummyTile();
                     }
                 }
 
@@ -196,9 +195,9 @@ namespace Synapse.Mahjong.Match
                         var currentDraw = _localState.LocalHand(_seat).GetCurrentDraw();
 
                         // Update the visuals based on the draw event.
-                        var hand = _hands[(int)_seat];
+                        var view = (LocalHandView)_hands[(int)_seat];
                         var tileObject = InstantiateTile(currentDraw);
-                        await hand.DrawTile(tileObject);
+                        await view.DrawTile(tileObject);
                     }
                     break;
 
@@ -211,8 +210,8 @@ namespace Synapse.Mahjong.Match
                         }
 
                         // Update the visuals based on the draw event.
-                        var hand = _hands[(int)remoteDraw.Seat];
-                        await hand.DrawDummyTile();
+                        var view = (RemoteHandView)_hands[(int)remoteDraw.Seat];
+                        await view.DrawDummyTile();
                     }
                     break;
 
@@ -224,13 +223,13 @@ namespace Synapse.Mahjong.Match
                         //
                         // Otherwise, perform the action on the local state and then verify that
                         // the local state is still in sync with the server state.
-                        if (_lastDiscard is TileId lastDiscard)
+                        if (discard.Seat == _seat)
                         {
-                            if (discard.Seat != _seat
-                                || discard.Tile.Element0 != lastDiscard.Element0)
+                            if (_lastDiscard == null
+                                || discard.Tile.Element0 != _lastDiscard.Value.Element0)
                             {
                                 throw new OutOfSyncException(
-                                    $"Previously discarded tile {lastDiscard}, but received" +
+                                    $"Previously discarded tile {_lastDiscard}, but received" +
                                     $"discard event {discard}");
                             }
 
@@ -241,8 +240,20 @@ namespace Synapse.Mahjong.Match
                         else if (_localState.TryDiscardTile(discard.Seat, discard.Tile))
                         {
                             // Perform the discard action locally.
-                            var hand = _hands[(int)discard.Seat];
-                            hand.MoveToDiscard(discard.Tile);
+                            switch (_hands[(int)discard.Seat])
+                            {
+                                case LocalHandView localHand:
+                                {
+                                    localHand.MoveToDiscard(discard.Tile);
+                                }
+                                break;
+
+                                case RemoteHandView remoteHand:
+                                {
+                                    remoteHand.DiscardTile(InstantiateTile(global::Mahjong.InstanceById(discard.Tile)));
+                                }
+                                break;
+                            }
 
                             // TODO: Remove the explicit delay once we have a proper animation.
                             await UniTask.Delay((int)(_delayAfterDiscard * 1000));
@@ -254,6 +265,41 @@ namespace Synapse.Mahjong.Match
 
                         // TODO: Reconcile our local state with the updated server state to
                         // verify that the two are in sync.
+                    }
+                    break;
+
+                    case MatchEvent.Pass _:
+                    {
+                        if (!_localState.TryDecidePass())
+                        {
+                            throw new OutOfSyncException($"Could not apply pass event to local state");
+                        }
+                    }
+                    break;
+
+                    case MatchEvent.Call callEvent:
+                    {
+                        var call = callEvent.Element0;
+
+                        if (!_localState.TryDecideCall(call))
+                        {
+                            throw new OutOfSyncException($"Unable to locally decide call: {call}");
+                        }
+
+                        // TODO: Visualize the call, i.e. remove the tile from the discarding
+                        // player's hand and form the open meld in the calling player's hand.
+                        var discardingHand = _hands[(int)call.CalledFrom];
+                        var discardView = discardingHand.RemoveLastDiscard();
+
+                        if (discardView.Model.Id.Element0 != call.Discard.Element0)
+                        {
+                            throw new OutOfSyncException(
+                                $"Attempting to call discarded tile {call.Discard}, but last " +
+                                $"discarded tile for {call.CalledFrom} was {discardView.Model.Id}");
+                        }
+
+                        var callingHand = _hands[(int)call.Caller];
+                        callingHand.CallTile(discardView, call.WinningCall);
                     }
                     break;
 
@@ -310,7 +356,7 @@ namespace Synapse.Mahjong.Match
         /// </remarks>
         private async UniTask DiscardTile()
         {
-            var hand = _hands[(int)_seat];
+            var hand = (LocalHandView)_hands[(int)_seat];
             var id = await hand.OnClickTileAsync(_cancellation.Token);
 
             // Attempt to discard the tile. If the operation fails, ignore the click event.
@@ -348,7 +394,7 @@ namespace Synapse.Mahjong.Match
                 var hand = _hands[(int)seat];
                 Debug.Assert(
                     seat == hand.Seat,
-                    $"{nameof(PlayerHand)} setup is incorrect, hand at seat {seat}" +
+                    $"{nameof(PlayerHandView)} setup is incorrect, hand at seat {seat}" +
                     $"configured for seat {hand.Seat}");
             }
         }

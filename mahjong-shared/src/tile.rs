@@ -309,6 +309,7 @@ pub fn by_id(id: TileId) -> Tile {
     instance_by_id(id).tile
 }
 
+#[cs_bindgen]
 pub fn instance_by_id(id: TileId) -> TileInstance {
     *TILE_SET
         .iter()

@@ -406,6 +406,14 @@ impl LocalState {
     pub fn try_discard_tile(&mut self, discarding_player: Wind, discard: TileId) -> bool {
         self.discard_tile(discarding_player, discard).is_ok()
     }
+
+    pub fn try_decide_call(&mut self, call: FinalCall) -> bool {
+        self.decide_call(Some(call)).is_ok()
+    }
+
+    pub fn try_decide_pass(&mut self) -> bool {
+        self.decide_call(None).is_ok()
+    }
 }
 
 /// The turn information for `LocalState`.
