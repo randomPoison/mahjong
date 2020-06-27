@@ -90,6 +90,7 @@ pub struct Credentials {
 pub enum ClientRequest {
     StartMatch,
     DiscardTile(DiscardTileRequest),
+    CallTile(Option<Call>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

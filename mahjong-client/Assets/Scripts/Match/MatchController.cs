@@ -40,6 +40,7 @@ namespace Synapse.Mahjong.Match
         [Header("UI Elements")]
         [SerializeField] private GameObject _matchEndedDisplayRoot = default;
         [SerializeField] private Button _exitButton = default;
+        [SerializeField] private CallDiscardPrompt _callDiscardPrompt = default;
 
         [Header("Action Timing")]
         [SerializeField] private float _delayAfterDraw = 1f;
@@ -145,7 +146,9 @@ namespace Synapse.Mahjong.Match
 
             }
 
-            // Process incoming updates from the server.
+            // Run the core loop of the match, alternating between performing any
+            // actions necessary for the current turn state and processing the next
+            // update coming from the server.
             var matchEnded = false;
             while (!matchEnded)
             {
@@ -171,7 +174,21 @@ namespace Synapse.Mahjong.Match
                     {
                         if (awaitingCalls.Calls.Count > 0)
                         {
-                            throw new NotImplementedException("Handle calling tiles");
+                            _callDiscardPrompt.gameObject.SetActive(true);
+                            var selectedCall = await _callDiscardPrompt.MakeCall(awaitingCalls.Calls, _cancellation.Token);
+                            _callDiscardPrompt.gameObject.SetActive(false);
+
+                            // Send the selected call action to the server.
+                            string request;
+                            if (selectedCall != null)
+                            {
+                                request = _localState.RequestCallTile(selectedCall);
+                            }
+                            else
+                            {
+                                request = _localState.RequestPass();
+                            }
+                            _socket.SendString(request);
                         }
                     }
                     break;
@@ -411,7 +428,7 @@ namespace Synapse.Mahjong.Match
 
             // If the local attempt to discard the tile succeeded, send a request to the
             // server to perform the action.
-            var request = _serverState.RequestDiscardTile(_seat, id);
+            var request = _serverState.RequestDiscardTile(id);
             _socket.SendString(request);
         }
 
