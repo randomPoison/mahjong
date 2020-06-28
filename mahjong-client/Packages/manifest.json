@@ -5,7 +5,8 @@
       "url": "https://package.openupm.com",
       "scopes": [
         "com.cysharp.unitask",
-        "com.openupm"
+        "com.openupm",
+        "com.random-poison.ghost-buster"
       ]
     }
   ],
@@ -14,7 +15,6 @@
     "com.unity.2d.sprite": "1.0.0",
     "com.unity.addressables": "1.6.0",
     "com.unity.ext.nunit": "1.0.0",
-    "com.unity.ide.vscode": "1.1.4",
     "com.unity.postprocessing": "2.2.2",
     "com.unity.render-pipelines.core": "7.3.1",
     "com.unity.render-pipelines.lightweight": "7.3.1",
@@ -51,6 +51,7 @@
     "com.unity.modules.video": "1.0.0",
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
-    "com.unity.modules.xr": "1.0.0"
+    "com.unity.modules.xr": "1.0.0",
+    "com.random-poison.ghost-buster": "1.0.0"
   }
 }
