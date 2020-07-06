@@ -1,4 +1,4 @@
-﻿using Synapse.Utils;
+using Synapse.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -155,6 +155,8 @@ namespace Synapse.Mahjong.Match
                 // Check the current state of the match and determine if there's any
                 // action that the local player needs to take.
                 var turnState = _localState.TurnState();
+                Debug.Log($"Handling current turn state: {turnState}");
+
                 switch (turnState)
                 {
                     // If it's the current player's turn to discard, wait for the player
@@ -205,6 +207,7 @@ namespace Synapse.Mahjong.Match
                 // state once received.
                 var eventJson = await _socket.RecvStringAsync(_cancellation.Token);
                 IMatchEvent update = _serverState.DeserializeAndHandleEvent(eventJson);
+                Debug.Log($"Handling incoming update: {update}");
 
                 // Apply the received update to the local state, updating both the game
                 // state tracking and the visual state.

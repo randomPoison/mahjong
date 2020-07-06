@@ -375,11 +375,7 @@ impl LocalState {
 
     /// Creates the request message for sending the discard action to the server.
     pub fn request_discard_tile(&self, tile: TileId) -> String {
-        let request = ClientRequest::DiscardTile(DiscardTileRequest {
-            id: self.id,
-            player: self.seat,
-            tile,
-        });
+        let request = ClientRequest::DiscardTile(tile);
         serde_json::to_string(&request).unwrap()
     }
 

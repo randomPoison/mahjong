@@ -355,16 +355,6 @@ impl MatchState {
     pub fn try_draw_tile(&mut self, seat: Wind) -> bool {
         self.draw_for_player(seat).is_ok()
     }
-
-    /// Creates the request message for sending the discard action to the server.
-    pub fn request_discard_tile(&mut self, player: Wind, tile: TileId) -> String {
-        let request = ClientRequest::DiscardTile(DiscardTileRequest {
-            id: self.id,
-            player,
-            tile,
-        });
-        serde_json::to_string(&request).unwrap()
-    }
 }
 
 /// Unique identifier for an active match.

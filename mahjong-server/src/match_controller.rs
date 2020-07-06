@@ -272,16 +272,22 @@ impl DummyClient {
             &LocalTurnState::AwaitingDiscard(seat) => {
                 if seat == self.seat {
                     let discard = self.state.local_hand(seat).tiles()[0].id;
-                    let _ = self.controller.discard_tile(self.seat, discard).unwrap();
+                    let result_fut = self.controller.discard_tile(self.seat, discard).unwrap();
+                    tokio::spawn(async move {
+                        result_fut.await.unwrap();
+                    });
                 }
             }
 
             LocalTurnState::AwaitingCalls { calls, .. } => {
                 if !calls.is_empty() {
-                    let _ = self
+                    let result_fut = self
                         .controller
                         .call_tile(self.seat, Some(calls[0]))
                         .unwrap();
+                    tokio::spawn(async move {
+                        result_fut.await.unwrap();
+                    });
                 }
             }
 

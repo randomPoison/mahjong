@@ -4,7 +4,7 @@ use futures::{
     prelude::*,
     stream::{SplitSink, SplitStream},
 };
-use mahjong::{anyhow::*, messages::*, tile::Wind};
+use mahjong::{anyhow::*, client::LocalState, messages::*, tile::Wind};
 use std::sync::atomic::{AtomicU64, Ordering};
 use thespian::{Actor, Remote, StageBuilder};
 use tracing::*;
@@ -153,24 +153,45 @@ impl ClientController {
 
                 trace!("Match started, joined as East player");
 
-                let response = serde_json::to_string(&StartMatchResponse { state })
-                    .expect("Failed to serialize `StartMatchResponse`");
+                let response = serde_json::to_string(&StartMatchResponse {
+                    state: state.clone(),
+                })
+                .expect("Failed to serialize `StartMatchResponse`");
                 self.send_text(response).await?;
 
                 trace!("Sent initial state to client, transitioning controller to `InMatch`");
-                self.state = ClientState::InMatch { controller };
+                self.state = ClientState::InMatch { controller, state };
             }
 
             ClientRequest::DiscardTile(request) => {
-                let controller = match &mut self.state {
-                    ClientState::InMatch { controller } => controller,
+                let (controller, state) = match &mut self.state {
+                    ClientState::InMatch { controller, state } => (controller, state),
                     _ => bail!("Cannot discard a tile when not in a match"),
                 };
 
                 trace!("Forwarding discard request to match controller");
 
                 let result = controller
-                    .discard_tile(request.player, request.tile)
+                    .discard_tile(state.seat, request)
+                    .expect("Match controller died before match ended")
+                    .await;
+
+                match result {
+                    Ok(()) => {}
+                    Err(err) => todo!("Notify client that discard failed? {}", err),
+                }
+            }
+
+            ClientRequest::CallTile(call) => {
+                let (controller, state) = match &mut self.state {
+                    ClientState::InMatch { controller, state } => (controller, state),
+                    _ => bail!("Cannot discard a tile when not in a match"),
+                };
+
+                trace!("Forwarding discard request to match controller");
+
+                let result = controller
+                    .call_tile(state.seat, call)
                     .expect("Match controller died before match ended")
                     .await;
 
@@ -205,7 +226,10 @@ impl ClientController {
 #[derive(Debug, Clone)]
 enum ClientState {
     Idle,
-    InMatch { controller: MatchControllerProxy },
+    InMatch {
+        controller: MatchControllerProxy,
+        state: LocalState,
+    },
 }
 
 /// Identifier for a connected client session.

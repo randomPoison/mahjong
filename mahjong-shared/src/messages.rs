@@ -6,7 +6,6 @@
 use crate::{
     client::LocalState,
     hand::Call,
-    match_state::MatchId,
     tile::{TileId, Wind},
 };
 use cs_bindgen::prelude::*;
@@ -89,20 +88,13 @@ pub struct Credentials {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ClientRequest {
     StartMatch,
-    DiscardTile(DiscardTileRequest),
+    DiscardTile(TileId),
     CallTile(Option<Call>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StartMatchResponse {
     pub state: LocalState,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DiscardTileRequest {
-    pub id: MatchId,
-    pub player: Wind,
-    pub tile: TileId,
 }
 
 /// An event that can happen during the match.

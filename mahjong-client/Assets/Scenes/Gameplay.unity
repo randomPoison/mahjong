@@ -1840,8 +1840,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b998e48bfb303c840ab362ded7db9578, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _callsRoot: {fileID: 0}
-  _passButton: {fileID: 0}
+  _callsRoot: {fileID: 900009225}
+  _passButton: {fileID: 737038855}
 --- !u!1 &2124905085
 GameObject:
   m_ObjectHideFlags: 0
