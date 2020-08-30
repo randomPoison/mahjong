@@ -1058,6 +1058,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 900009225}
+  - component: {fileID: 900009226}
   m_Layer: 5
   m_Name: Calls
   m_TagString: Untagged
@@ -1084,6 +1085,31 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 200}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &900009226
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 900009224}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 4
+  m_Spacing: 0
+  m_ChildForceExpandWidth: 0
+  m_ChildForceExpandHeight: 0
+  m_ChildControlWidth: 0
+  m_ChildControlHeight: 0
+  m_ChildScaleWidth: 0
+  m_ChildScaleHeight: 0
 --- !u!1 &978116032
 GameObject:
   m_ObjectHideFlags: 0
@@ -1842,6 +1868,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _callsRoot: {fileID: 900009225}
   _passButton: {fileID: 737038855}
+  _callPrefab: {fileID: -2718127254393428779, guid: df04e8543ed6c3f4e9c5c07f38b59273,
+    type: 3}
 --- !u!1 &2124905085
 GameObject:
   m_ObjectHideFlags: 0
