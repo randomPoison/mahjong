@@ -152,8 +152,9 @@ namespace Synapse.Mahjong.Match
             var matchEnded = false;
             while (!matchEnded)
             {
-                // Check the current state of the match and determine if there's any
-                // action that the local player needs to take.
+                // Check the current state of the match and determine if there's any action that
+                // the local player needs to take.
+                // --------------------------------------------------------------------------------
                 var turnState = _localState.TurnState();
                 Debug.Log($"Handling current turn state: {turnState}");
 
@@ -205,6 +206,7 @@ namespace Synapse.Mahjong.Match
 
                 // Wait to receive the next update from the server and merge it in with the server
                 // state once received.
+                // --------------------------------------------------------------------------------
                 var eventJson = await _socket.RecvStringAsync(_cancellation.Token);
                 IMatchEvent update = _serverState.DeserializeAndHandleEvent(eventJson);
                 Debug.Log($"Handling incoming update: {update}");
@@ -312,6 +314,10 @@ namespace Synapse.Mahjong.Match
                     }
                     break;
 
+                    // A player made a call. If it was the local player, we reconcile the event
+                    // with our local state, ensuring that the update from the server matches the
+                    // call that we made locally. If it was a remote player, we update our local
+                    // state.
                     case MatchEvent.Call callEvent:
                     {
                         var call = callEvent.Element0;
@@ -333,8 +339,7 @@ namespace Synapse.Mahjong.Match
                                 $"discarded tile for {call.CalledFrom} was {discardView.Model.Id}");
                         }
 
-                        var callingHand = _hands[(int)call.Caller];
-                        switch (callingHand)
+                        switch (_hands[(int)call.Caller])
                         {
                             case LocalHandView localHand:
                             {

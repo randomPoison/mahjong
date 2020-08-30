@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using UniRx.Async;
@@ -53,7 +53,7 @@ namespace Synapse.Mahjong.Match
 
             // Get the `TileView` object for the selected tile, either from the tiles
             // in the player's hand or from the current draw.
-            var discardIndex = _tileViews.FindIndex(tile => tile.Model.Id.Element0 == id.Element0);
+            var discardIndex = FindIndex(id);
             if (discardIndex >= 0)
             {
                 discarded = _tileViews[discardIndex];
@@ -94,7 +94,41 @@ namespace Synapse.Mahjong.Match
 
         public void CallTile(TileView discard, ICall call)
         {
-            throw new NotImplementedException("Implement calling for local hand");
+            // Remove other tiles that are part of the meld from the player's hand.
+            switch (call)
+            {
+                case Call.Chii chii:
+                {
+                    var meld = new List<TileView>
+                    {
+                        discard,
+                        RemoveFromHand(chii.Element0),
+                        RemoveFromHand(chii.Element1),
+                    };
+                    AddMeld(meld);
+                }
+                break;
+
+                case Call.Pon pon:
+                {
+                    throw new NotImplementedException();
+                }
+
+                case Call.Kan kan:
+                {
+                    throw new NotImplementedException();
+                }
+
+                case Call.Ron ron:
+                {
+                    throw new NotImplementedException();
+                }
+
+                default:
+                    throw new NotImplementedException($"Unhandled call: {call}");
+            }
+
+            // TODO: Add the completed meld to the player's open melds.
         }
 
         public UniTask<TileId> OnClickTileAsync(CancellationToken cancellation = default)
@@ -112,6 +146,50 @@ namespace Synapse.Mahjong.Match
                 completion.TrySetResult(id);
                 TileClicked -= Handler;
             }
+        }
+
+        /// <summary>
+        /// Removes the tile with the specified ID from the hand.
+        /// </summary>
+        ///
+        /// <param name="id">The ID of the tile to remove.</param>
+        ///
+        /// <returns>
+        /// The view object for the specified tile.
+        /// </returns>
+        private TileView RemoveFromHand(TileId id)
+        {
+            var index = FindIndex(id);
+            var view = _tileViews[index];
+
+            // Remove the tile view from our local tracking.
+            _tileViews.RemoveAt(index);
+
+            // Remove the game object from the underlying hand view.
+            RemoveFromHand(index);
+
+            return view;
+        }
+
+        /// <summary>
+        /// Returns the index of the specified tile ID.
+        /// </summary>
+        ///
+        /// <param name="id">The ID of the tile to find.</param>
+        ///
+        /// <returns>
+        /// The index of the tile within the player's hand, or -1 if the tile is not in
+        /// the player's hand.
+        /// </returns>
+        ///
+        /// <remarks>
+        /// Only the player's main hand is searched, so this will return -1 even if the
+        /// tile is the player's current draw, in the player's discards, or in an open
+        /// meld.
+        /// </remarks>
+        private int FindIndex(TileId id)
+        {
+            return _tileViews.FindIndex(tile => tile.Model.Id.Element0 == id.Element0);
         }
 
         #region Event Handlers

@@ -1,4 +1,4 @@
-﻿using Synapse.Utils;
+using Synapse.Utils;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using UnityEngine;
@@ -10,9 +10,16 @@ namespace Synapse.Mahjong.Match
     /// </summary>
     ///
     /// <remarks>
+    /// <para>
     /// This class has the core logic for managing the game objects representing the tiles in a
     /// players hand. Most of its functionality is kept <c>protected</c> with the expectation that
     /// the derived class will re-expose that functionality in a more appropriate way.
+    /// </para>
+    ///
+    /// <para>
+    /// For the concrete player hand view logic, see <see cref="LocalHandView"/> and
+    /// <see cref="RemoteHandView"/>.
+    /// </para>
     /// </remarks>
     public abstract class PlayerHandView : MonoBehaviour
     {
@@ -23,6 +30,7 @@ namespace Synapse.Mahjong.Match
         // asset.
         public const float TileWidth = 0.026f;
         public const float TileLength = 0.034f;
+        public const float MeldSpacing = 0.01f;
 
         #endregion
 
@@ -81,6 +89,18 @@ namespace Synapse.Mahjong.Match
             _currentDraw = tile;
         }
 
+        /// <summary>
+        /// Removes a tile from the player's hand.
+        /// </summary>
+        ///
+        /// <param name="index">The index of the tile to remove.</param>
+        ///
+        /// <returns>The game object for the tile.</returns>
+        ///
+        /// <remarks>
+        /// The tile is removed both the hand's internal tracking and from the root
+        /// object's list of children.
+        /// </remarks>
         protected GameObject RemoveFromHand(int index)
         {
             var tile = _tiles[index];
@@ -117,6 +137,17 @@ namespace Synapse.Mahjong.Match
         protected void AddMeld(List<TileView> meld)
         {
             _melds.Add(meld);
+
+            // Make all of the tile view objects children of the meld root object.
+            //
+            // TODO: We may eventually want to give each meld its own dedicated root
+            // object to make layout easier, but for now we'll make all of meld tiles
+            // direct children of the meld root.
+            foreach (var view in meld)
+            {
+                view.transform.SetParent(_meldRoot, false);
+            }
+
             LayoutHand();
         }
 
@@ -152,7 +183,32 @@ namespace Synapse.Mahjong.Match
                 }
             }
 
-            // TODO: Layout the melds.
+            // Layout the melds. For now we layout the tiles in the meld left-to-right
+            // with all tiles in the meld adjacent to each other and with a small gap
+            // between the melds.
+            //
+            // TODO: Improve meld visualization:
+            //
+            // * Rotate the tile that was called.
+            // * Display melds in multiple rows if necessary to make better use of space.
+            {
+                var tilePos = 0f;
+                foreach (var meld in _melds)
+                {
+                    foreach (var tile in meld)
+                    {
+                        tile.transform.localPosition = new Vector3(
+                            tilePos,
+                            0f,
+                            TileLength * 0.5f);
+                        tile.transform.localRotation = Quaternion.identity;
+
+                        tilePos += TileWidth;
+                    }
+
+                    tilePos += MeldSpacing;
+                }
+            }
         }
     }
 }

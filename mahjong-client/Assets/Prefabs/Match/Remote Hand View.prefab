@@ -12,11 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 51b194b39b0189548b7d82a15b0519f7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _seat: 0
   _handRoot: {fileID: 3421234996007820743}
   _drawTileAnchor: {fileID: 3186092977689192766}
   _discardRoot: {fileID: 7827110153796559043}
-  _meldRoot: {fileID: 0}
+  _meldRoot: {fileID: 5153702284837661375}
 --- !u!1001 &1717901023732501331
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -107,6 +106,12 @@ Transform:
 --- !u!4 &7827110153796559043 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8883436946425031568, guid: 98d70d7408274704894f368c33836bfb,
+    type: 3}
+  m_PrefabInstance: {fileID: 1717901023732501331}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &5153702284837661375 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 5787852355181814252, guid: 98d70d7408274704894f368c33836bfb,
     type: 3}
   m_PrefabInstance: {fileID: 1717901023732501331}
   m_PrefabAsset: {fileID: 0}
