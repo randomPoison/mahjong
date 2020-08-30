@@ -406,10 +406,6 @@ namespace Synapse.Mahjong.Match
         /// <returns>
         /// A task that resolves once the discard action has finished.
         /// </returns>
-        ///
-        /// <remarks>
-        /// 
-        /// </remarks>
         private async UniTask DiscardTile()
         {
             var hand = (LocalHandView)_hands[(int)_seat];

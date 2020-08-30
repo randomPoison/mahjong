@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UniRx.Async;
@@ -103,6 +103,39 @@ namespace Synapse.Mahjong.Match
             AddDrawTile(Instantiate(prefab));
 
             // TODO: Animate the draw action.
+        }
+
+        /// <summary>
+        /// Remove the tile at the specified index from the hand view, destroying it
+        /// automatically.
+        /// </summary>
+        ///
+        /// <param name="index">The index of the tile view to remove.</param>
+        ///
+        /// <remarks>
+        /// This function deliberately hides the method of the same name in the base
+        /// class in order to avoid the case where we accidentally remove the tile from
+        /// the hand without destroying it. For remote hands, the player's hand will
+        /// always contain dummy tiles (because we don't know the actual tiles in the
+        /// hand), so when we remove a tile from the hand we're always going to be
+        /// replacing it with a new instance of the correct tile value.
+        /// </remarks>
+        private new void RemoveFromHand(int index)
+        {
+            Destroy(base.RemoveFromHand(index));
+        }
+
+        /// <summary>
+        /// Remove the current draw tile from the hand view, destroying it automatically.
+        /// </summary>
+        ///
+        /// <remarks>
+        /// See the remarks on <see cref="RemoveFromHand"/> for notes on why this method
+        /// hides the method of the same name in the base class.
+        /// </remarks>
+        private new void RemoveCurrentDraw()
+        {
+            Destroy(base.RemoveCurrentDraw());
         }
     }
 }
