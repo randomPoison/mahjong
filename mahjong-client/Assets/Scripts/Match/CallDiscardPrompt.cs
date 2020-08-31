@@ -1,4 +1,5 @@
 using Synapse.Mahjong.Match;
+using Synapse.Utils;
 using System.Collections.Generic;
 using System.Threading;
 using UniRx.Async;
@@ -17,7 +18,9 @@ namespace Synapse.Mahjong
 
         [SerializeField] private CallView _callPrefab = default;
 
-        public async UniTask<ICall> MakeCall(List<ICall> calls, CancellationToken cancellation)
+        public async UniTask<ICall> MakeCall(
+            List<ICall> calls,
+            CancellationToken cancellation = default)
         {
             var linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation);
             try
@@ -47,9 +50,14 @@ namespace Synapse.Mahjong
                 linkedCancellation.Cancel();
                 linkedCancellation.Dispose();
 
-                // TODO: Destroy view objects for the calls.
+                // Destroy view objects for the calls.
+                //
+                // TODO: Pool the view objects instead of completely destroying them?
+                _callsRoot.DestroyChildren();
             }
 
+            // Helper function for handling when the player clicks the pass button.
+            // Returns null to indicate that no call was made.
             async UniTask<ICall> OnPassAsync()
             {
                 await _passButton.OnClickAsync(linkedCancellation.Token);
